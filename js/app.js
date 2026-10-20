@@ -73,7 +73,9 @@ function renderPlay(moved){
   board.dataset.game=S.gid;
   board.replaceChildren(S.game.render(s,ctx));
   Skins.decorate(S.gid,board);
-  $('hint').textContent=pn(S.hint??S.game.how);
+  fitBox(board);
+  armed=null;
+  $('hint').textContent=touchify(pn(S.hint??S.game.how),board.querySelector('[data-hov]'));
   $('undo').disabled=!started||S.busy;
   if(S.entering){S.entering=false;enterBoard()}
 }
@@ -95,9 +97,11 @@ function showIntro(){
   for(let i=0;i<18;i++) motif.append(el('i',{class:'m-'+(g.motif||'disc')+(i%3===0?' m-dark':''),style:`--x:${R(2,92)}%;--y:${R(2,88)}%;--s:${R(14,40)}px;--t:${R(5,11)}s;--d:-${R(0,8)}s;--dx:${R(-60,60)}px;--dy:${R(-50,50)}px;--r:${R(-90,90)}deg`}));
   const go=el('button',{class:'go',type:'button'},'Enter the game');
   go.addEventListener('click',enterGame);
+  const how=el('button',{class:'go alt narrow-only',type:'button'},'How to play');
+  how.addEventListener('click',()=>{enterGame();setTimeout(openSheet,380)});
   box.replaceChildren(motif,el('div',{class:'intro-inner'},
     el('span',{class:'chip'},`${KIND[g.kind]||g.kind} · game ${GAMES.indexOf(g)+1} of ${GAMES.length}`),title,el('p',{},g.blurb),
-    el('div',{class:'mood'},el('span',{class:'eq'},el('i'),el('i'),el('i')),`Theme: ${Music.mood(g.id)}`),go));
+    el('div',{class:'mood'},el('span',{class:'eq'},el('i'),el('i'),el('i')),`Theme: ${Music.mood(g.id)}`),el('div',{class:'go-row'},go,how)));
   box.hidden=false;box.classList.remove('out');box.classList.add('playing');
   Music.stop();updateNowPlaying();
   setTimeout(()=>{try{go.focus({preventScroll:true})}catch(e){}},50);
@@ -106,6 +110,7 @@ function enterGame(){
   Sound.unlock().then(()=>{Sound.fx('enter',{id:S.gid});Music.play(S.gid);updateNowPlaying()});
   const box=$('intro');box.classList.add('out');setTimeout(()=>{if(box.classList.contains('out'))box.hidden=true},600);
   S.entering=true;renderPlay();
+  $('howBtn').classList.toggle('nudge',!S.sawHow);
 }
 
 function updateNowPlaying(){
@@ -122,11 +127,60 @@ function newPosition(animate){
   renderInfo();S.entering=!!animate;renderPlay();
   Demo.start(S.game,$('demoBox'),$('demoCap'));
 }
-function startGame(id){S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false);showIntro()}
+function startGame(id){closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false);showIntro()}
 function nextRandom(){
   if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>id!==S.gid));
   startGame(S.bag.pop());
   try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}
+}
+
+/* ---------- phones and touchscreens ---------- */
+const narrow=()=>typeof matchMedia==='function'&&matchMedia('(max-width:880px)').matches;
+const TOUCH_HOW=[
+  [/Hover one of your pieces to preview(?: the push)?, then click it\./,'Tap one of your pieces to preview the move, then tap it again to play.'],
+  [/Hover a domino you can topple\. Click its left half to topple it left, its right half to topple it right\./,'Tap the left or right half of a domino to see which way it falls, then tap again to topple it.'],
+  [/Hover a square to preview your domino, then click to place it\./,'Tap a square to preview your domino, then tap it again to place it.'],
+  [/Click one of your dots\. Hover first to see what disappears\./,'Tap one of your dots to see what disappears, then tap again to play.']
+];
+function touchify(t,previews){
+  if(!t||!touchUI()) return t;
+  for(const [re,r] of TOUCH_HOW) t=t.replace(re,r);
+  t=t.replace(/\bclicked\b/g,'tapped').replace(/\bClick\b/g,'Tap').replace(/\bclick\b/g,'tap').replace(/\bHover\b/g,'Tap');
+  if(previews&&!/again/.test(t)) t+=' Tap once to preview, then tap again to play.';
+  return t;
+}
+
+/* a finger cannot hover, so a move with a preview takes two taps: look, then play */
+let ptr='mouse',armed=null,hintWas='';
+function disarm(){if(!armed)return;const a=armed;armed=null;a.classList.remove('armed');if(a.isConnected){a._hov.off();$('hint').textContent=hintWas}}
+function tapToConfirm(e){
+  if(ptr!=='touch') return;
+  const n=e.target.closest?e.target.closest('[data-hov]'):null;
+  if(n&&n===armed){armed=null;n.classList.remove('armed');return}
+  disarm();
+  if(!n||!$('board').contains(n)||!ctx.live) return;
+  e.preventDefault();e.stopImmediatePropagation();
+  armed=n;n.classList.add('armed');n._hov.off();n._hov.on();
+  hintWas=$('hint').textContent;$('hint').textContent='Tap it again to play this move, or tap anywhere else to cancel.';
+  Sound.fx('pick');
+}
+
+/* on narrow screens the rules and demo live in a sheet that slides up over the board */
+function openSheet(){
+  if(!narrow()){$('rules').scrollIntoView({behavior:'smooth',block:'start'});return}
+  document.body.classList.add('sheet-open');$('scrim').hidden=false;$('rules').scrollTop=0;
+  S.sawHow=true;$('howBtn').classList.remove('nudge');fitBox($('demoBox'));
+  setTimeout(()=>{try{$('sheetClose').focus({preventScroll:true})}catch(e){}},60);
+}
+function closeSheet(){
+  if(!document.body.classList.contains('sheet-open')) return;
+  document.body.classList.remove('sheet-open');$('scrim').hidden=true;$('rules').style.transform='';
+}
+function swipeToClose(handle,sheet){
+  let y0=null,dy=0;
+  handle.addEventListener('touchstart',e=>{y0=e.touches[0].clientY;dy=0;sheet.classList.add('dragging')},{passive:true});
+  handle.addEventListener('touchmove',e=>{if(y0==null)return;dy=Math.max(0,e.touches[0].clientY-y0);sheet.style.transform=`translateY(${dy}px)`},{passive:true});
+  handle.addEventListener('touchend',()=>{sheet.classList.remove('dragging');if(dy>80)closeSheet();else sheet.style.transform='';y0=null});
 }
 
 function boot(){
@@ -142,6 +196,14 @@ function boot(){
   $('sfxBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('sfx',!Sound.pref.sfx);Sound.fx('pick');updateNowPlaying()}));
   $('lookBtn').addEventListener('click',()=>{Skins.set(!Skins.on);Sound.fx('pick');updateNowPlaying();if(!S.busy)renderPlay()});
   Skins.install();
+  $('howBtn').addEventListener('click',openSheet);
+  $('sheetClose').addEventListener('click',closeSheet);
+  $('scrim').addEventListener('click',closeSheet);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
+  swipeToClose($('sheetHead'),$('rules'));
+  document.addEventListener('pointerdown',e=>{ptr=e.pointerType},true);
+  document.addEventListener('click',tapToConfirm,true);
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{fitBox($('board'));fitBox($('demoBox'));if(!narrow())closeSheet()},120)});
   updateNowPlaying();
   nextRandom();
 }

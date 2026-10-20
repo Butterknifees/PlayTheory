@@ -44,7 +44,7 @@ const Demo=(()=>{
   function reset(my){
     if(my!==run) return;
     st=game.create();st.turn=R(0,1);
-    box.replaceChildren(draw(st));say(null,'A new round begins…');
+    box.replaceChildren(draw(st));fitBox(box);say(null,'A new round begins…');
     timer=setTimeout(()=>step(my),1500);
   }
   function step(my){
@@ -62,7 +62,7 @@ const Demo=(()=>{
     say(mover,`${name(mover)} moves`+(next.turn===mover?' and goes again':''));
     timer=setTimeout(()=>{
       if(my!==run) return;
-      box.replaceChildren(nextNode);
+      box.replaceChildren(nextNode);fitBox(box);
       nextNode.querySelectorAll('[data-din]').forEach(e=>e.classList.add('d-in'));
       st=next;timer=setTimeout(()=>step(my),1050);
     },750);

@@ -47,7 +47,17 @@ function sv(tag,props,...kids){
   for(const k of kids.flat()) if(k!=null) e.append(k.nodeType?k:document.createTextNode(k));
   return e;
 }
-function hov(n,on,off){n.addEventListener('mouseenter',on);n.addEventListener('mouseleave',off);n.addEventListener('focus',on);n.addEventListener('blur',off)}
+/* hover previews; on a touchscreen the first tap shows the preview and the second makes the move (see app.js) */
+function hov(n,on,off){n.addEventListener('mouseenter',on);n.addEventListener('mouseleave',off);n.addEventListener('focus',on);n.addEventListener('blur',off);n._hov={on,off};n.setAttribute('data-hov','')}
+const touchUI=()=>typeof matchMedia==='function'&&matchMedia('(hover: none), (pointer: coarse)').matches;
+/* shrink a board to the width it has, instead of letting it run off a phone screen */
+function fitBox(box){
+  const c=box&&box.firstElementChild;if(!c)return;
+  box.style.setProperty('--fit','1');
+  const cs=getComputedStyle(box),avail=box.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const w=Math.max(c.scrollWidth,c.offsetWidth);
+  if(avail>0&&w>avail+1) box.style.setProperty('--fit',Math.max(.4,avail/w).toFixed(3));
+}
 /* make an svg node behave like a button */
 function act(n,fn,label){
   n.setAttribute('tabindex','0');n.setAttribute('role','button');if(label)n.setAttribute('aria-label',label);
