@@ -7,8 +7,8 @@ const Demo=(()=>{
   const IGNORE=/\b(ok|doom|popin|d-in|d-out|fresh|stamp)\b/g;
 
   function stop(){clearTimeout(timer);timer=null;run++}
-  function start(g,boxEl,capEl){stop();game=g;box=boxEl;cap=capEl;const my=run;reset(my)}
-  function draw(s){dctx.ui={};try{return game.render(s,dctx)}catch(e){console.error(e);return el('div')}}
+  function start(g,boxEl,capEl){stop();game=g;box=boxEl;cap=capEl;box.dataset.game=g.id;const my=run;reset(my)}
+  function draw(s){dctx.ui={};try{const n=game.render(s,dctx);Skins.decorate(game.id,n);return n}catch(e){console.error(e);return el('div')}}
   function say(p,text){cap.replaceChildren(...(p==null?[]:[el('span',{class:'dot d'+p})]),el('span',{},text))}
   function outcome(s){const r=game.result?game.result(s):null;if(r)return r;return game.hasMove(s,s.turn)?null:{winner:1-s.turn}}
 

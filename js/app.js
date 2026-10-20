@@ -70,7 +70,9 @@ function renderPlay(moved){
   }else res.hidden=true;
   S.hint=null;
   const board=$('board');
+  board.dataset.game=S.gid;
   board.replaceChildren(S.game.render(s,ctx));
+  Skins.decorate(S.gid,board);
   $('hint').textContent=pn(S.hint??S.game.how);
   $('undo').disabled=!started||S.busy;
   if(S.entering){S.entering=false;enterBoard()}
@@ -112,6 +114,7 @@ function updateNowPlaying(){
   $('npText').textContent=on?Music.mood(S.gid):Sound.pref.music?'Music starts when you enter a game':'Music off';
   $('musicBtn').setAttribute('aria-pressed',String(Sound.pref.music));
   $('sfxBtn').setAttribute('aria-pressed',String(Sound.pref.sfx));
+  $('lookBtn').setAttribute('aria-pressed',String(Skins.on));
 }
 
 function newPosition(animate){
@@ -137,6 +140,8 @@ function boot(){
   $('next').addEventListener('click',nextRandom);
   $('musicBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('music',!Sound.pref.music);if(Sound.pref.music&&$('intro').hidden)Music.play(S.gid);else if(!Sound.pref.music)Music.stop();updateNowPlaying()}));
   $('sfxBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('sfx',!Sound.pref.sfx);Sound.fx('pick');updateNowPlaying()}));
+  $('lookBtn').addEventListener('click',()=>{Skins.set(!Skins.on);Sound.fx('pick');updateNowPlaying();if(!S.busy)renderPlay()});
+  Skins.install();
   updateNowPlaying();
   nextRandom();
 }

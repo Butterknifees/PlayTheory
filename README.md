@@ -2,7 +2,7 @@
 
 Two players, one screen. Challenge a friend, unwind, or keep your brain sharp.
 
-PlayTheory deals you a random game, shows its rules and a short demo, and lets two people play on the same computer. There are 34 games, including Nim, Domineering, Hackenbush, Amazons, Hex, Dots & Boxes, Toppling Dominoes and Clobber. Every game has its own music, sounds and animations.
+PlayTheory deals you a random game, shows its rules and a short demo, and lets two people play on the same computer. There are 34 games, including Nim, Domineering, Hackenbush, Amazons, Hex, Dots & Boxes, Toppling Dominoes and Clobber. Every game has its own music, sounds and animations, and a themed board (trains, frogs, bowling pins, chocolate, marble queens and more). Use the **Themed** button to switch to a plain look.
 
 **Play it:** open `index.html` in a browser, or visit the GitHub Pages site.
 
@@ -19,6 +19,7 @@ Plain HTML, CSS and JavaScript. No build step and no dependencies.
 | `js/games.js` | The 34 games: rules, legal moves, board and move animations |
 | `js/fx.js` | Particle effects (the Amazons flaming arrow, captures, confetti) |
 | `js/audio.js` | Generated music themes for every game, and sound effects |
+| `js/skins.js` | Themed boards: the drawn pieces and per-game table styles. Classic mode turns it off |
 | `js/demo.js` | The "Watch a round" demo that plays real games on a loop |
 | `js/app.js` | The game table: dealing, turns, intro screens, sound controls |
 
