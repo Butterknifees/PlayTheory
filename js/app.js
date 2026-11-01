@@ -65,10 +65,18 @@ function syncMusic(){
   if(Music.current!==was) updateNowPlaying();
 }
 
+/* once the first move is made, everything but the game itself steps aside until the game ends */
+function syncFocus(){
+  const on=document.body.dataset.view==='play'&&S.hist.length>0&&!S.over;
+  if(on===document.body.classList.contains('focus')) return;
+  document.body.classList.toggle('focus',on);
+  if(on) try{window.scrollTo({top:0})}catch(e){}
+}
+
 function renderPlay(moved){
   if(!S.state) return;
   check();
-  syncMusic();
+  syncMusic();syncFocus();
   const s=S.state,over=S.over;
   $('play').dataset.turn=over?'':s.turn;
   const t=$('turn');t.className='turn t'+s.turn+(moved?' bump':'');
@@ -76,6 +84,7 @@ function renderPlay(moved){
   t.replaceChildren(...(over?[el('span',{},'Game over')]:[el('span',{class:'dot'}),el('span',{},S.game.status&&S.game.status(s)||(mine?'Your move':`${name(s.turn)} to move`))]));
   const started=S.hist.length>0;
   $('f0').parentElement.hidden=free;
+  t.parentElement.classList.toggle('free',free);
   [0,1].forEach(p=>{const b=$('f'+p);b.textContent=name(p);b.setAttribute('aria-pressed',String(S.starter===p));b.disabled=started});
   const res=$('result');
   if(over){
@@ -167,6 +176,7 @@ function view(v){
   const home=v==='home';
   $('home').hidden=!home;$('table').hidden=home;$('crumb').hidden=home;
   document.body.dataset.view=v;
+  if(home) document.body.classList.remove('focus');
 }
 function setRoute(id){
   const h=id?'#/play/'+id:'#/';
@@ -341,6 +351,7 @@ function boot(){
   $('restart').addEventListener('click',()=>{if(!S.busy)newPosition(true)});
   $('next').addEventListener('click',goHome);
   $('homeBtn').addEventListener('click',goHome);
+  $('focusExit').addEventListener('click',()=>{if(confirm('Leave this game? The scores so far will be lost.'))goHome()});
   $('surprise').addEventListener('click',()=>{Sound.unlock();nextRandom()});
   $('musicBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('music',!Sound.pref.music);if(Sound.pref.music&&$('intro').hidden)Music.play(S.gid);else if(!Sound.pref.music)Music.stop();updateNowPlaying()}));
   $('sfxBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('sfx',!Sound.pref.sfx);Sound.fx('pick');updateNowPlaying()}));
