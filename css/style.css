@@ -86,6 +86,8 @@ h1{font-family:var(--f-display);font-weight:900;font-size:clamp(28px,4vw,38px);l
 .result p{margin:2px 0 0;font-size:14px}
 .result .row{display:flex;gap:8px;flex-wrap:wrap}
 footer{color:var(--muted);font-size:13px;text-align:center}
+.foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin-bottom:8px;font-size:14px}
+.foot-links a{color:var(--muted)}
 
 /* ---------- pieces ---------- */
 .sL{background:var(--left)} .sR{background:var(--right)} .sN{background:var(--neutral)}
@@ -386,6 +388,11 @@ button.card15:not(:disabled):hover{transform:translateY(-3px)}
   transition:transform .15s ease,box-shadow .15s ease,border-color .15s}
 .gcard:hover,.gcard:focus-visible{transform:translateY(-3px);box-shadow:0 12px 28px rgba(36,36,36,.14);border-color:var(--brand-blue)}
 .gcard.is-new{border:2px solid var(--brand-blue)}
+.gcard.upcoming{cursor:default;border-style:dashed}
+.gcard.upcoming:hover,.gcard.upcoming:focus-visible{transform:none;box-shadow:none;border-color:var(--line)}
+.gcard.upcoming .gprev{filter:grayscale(1);opacity:.45}
+.gcard.upcoming h3,.gcard.upcoming p{opacity:.7}
+.chip.upcoming{background:var(--charcoal);border-color:var(--charcoal);color:#fff}
 .gprev{height:150px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden;pointer-events:none;position:relative;--cell:22px}
 .gprev > *{zoom:var(--fit,1);max-width:none}
 .gprev .svgb{width:300px;max-width:none}

@@ -110,7 +110,7 @@ function showIntro(){
   const how=el('button',{class:'go alt narrow-only',type:'button'},'How to play');
   how.addEventListener('click',()=>{enterGame();setTimeout(openSheet,380)});
   box.replaceChildren(motif,el('div',{class:'intro-inner'},
-    el('span',{class:'chip'},`${KIND[g.kind]||g.kind} · game ${GAMES.indexOf(g)+1} of ${GAMES.length}`),title,el('p',{},g.blurb),
+    el('span',{class:'chip'},KIND[g.kind]||g.kind),title,el('p',{},g.blurb),
     el('div',{class:'mood'},el('span',{class:'eq'},el('i'),el('i'),el('i')),`Theme: ${Music.mood(g.id)}`),el('div',{class:'go-row'},go,how)));
   box.hidden=false;box.classList.remove('out');box.classList.add('playing');
   Music.stop();updateNowPlaying();
@@ -140,9 +140,10 @@ function newPosition(animate,dealt){
   Demo.start(S.game,$('demoBox'),$('demoCap'));
   if(!dealt) Online.push('new');
 }
-function startGame(id){closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false,true);showIntro();Online.push('game')}
+function startGame(id){if(!playable(id)){goHome();return}closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false,true);showIntro();Online.push('game')}
 function nextRandom(){
-  if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>id!==S.gid));
+  if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>playable(id)&&id!==S.gid));
+  if(!S.bag.length) S.bag=[FEATURED];
   startGame(S.bag.pop());
   try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}
 }
@@ -151,6 +152,9 @@ function nextRandom(){
 const FILTERS=[['all','All games'],['new','New'],['Partizan',KIND.Partizan],['Impartial',KIND.Impartial],['Scoring',KIND.Scoring]];
 let filter='all',previewObs=null;
 const FEATURED='duosudoku';
+/* only these games are open for now; every other card says Coming soon and cannot be started */
+const PLAYABLE=new Set([FEATURED]);
+const playable=id=>PLAYABLE.has(id);
 function view(v){
   const home=v==='home';
   $('home').hidden=!home;$('table').hidden=home;$('crumb').hidden=home;
@@ -168,8 +172,8 @@ function goHome(){
   requestAnimationFrame(()=>document.querySelectorAll('.gprev.drawn').forEach(fitPreview));
 }
 function route(){
-  const m=location.hash.match(/^#\/play\/([a-z0-9]+)/),id=m&&GAMES.some(g=>g.id===m[1])?m[1]:null;
-  if(!id){if(document.body.dataset.view!=='home')goHome();return}
+  const m=location.hash.match(/^#\/play\/([a-z0-9]+)/),id=m&&GAMES.some(g=>g.id===m[1])&&playable(m[1])?m[1]:null;
+  if(!id){if(document.body.dataset.view!=='home'||m)goHome();return}
   if(id===S.gid&&S.state){view('play');return}
   startGame(id);
 }
@@ -216,16 +220,16 @@ function buildHome(){
   }));
   buildFeatured();
   const list=GAMES.filter(g=>filter==='all'?g.id!==FEATURED:(filter==='new'?g.isNew:g.kind===filter))
-    .sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
+    .sort((a,b)=>(playable(b.id)-playable(a.id))||(b.isNew?1:0)-(a.isNew?1:0));
   if(previewObs) previewObs.disconnect();
   previewObs=typeof IntersectionObserver==='function'?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){previewObs.unobserve(e.target);drawPreview(e.target)}}),{rootMargin:'200px'}):null;
   $('cards').replaceChildren(...list.map(g=>{
-    const prev=el('div',{class:'gprev','data-game':g.id,'aria-hidden':'true'});
-    const card=el('button',{class:'gcard'+(g.isNew?' is-new':''),type:'button','aria-label':`Play ${g.name}`},
+    const prev=el('div',{class:'gprev','data-game':g.id,'aria-hidden':'true'}),open=playable(g.id);
+    const card=el('button',{class:'gcard'+(!open?' upcoming':g.isNew?' is-new':''),type:'button','aria-label':open?`Play ${g.name}`:`${g.name}: coming soon`},
       prev,el('div',{class:'gbody'},
-        el('div',{class:'gmeta'},el('span',{class:'chip'},KIND[g.kind]||g.kind),g.isNew?el('span',{class:'chip new'},'New'):null),
+        el('div',{class:'gmeta'},el('span',{class:'chip'},KIND[g.kind]||g.kind),!open?el('span',{class:'chip upcoming'},'Coming soon'):g.isNew?el('span',{class:'chip new'},'New'):null),
         el('h3',{},g.name),el('p',{},g.blurb)));
-    card.addEventListener('click',()=>{Sound.unlock();startGame(g.id)});
+    if(open) card.addEventListener('click',()=>{Sound.unlock();startGame(g.id)}); else card.disabled=true;
     if(previewObs) previewObs.observe(prev); else setTimeout(()=>drawPreview(prev),0);
     return card;
   }));
@@ -319,7 +323,10 @@ function askNames(join){
 function boot(){
   [['nameL',0],['nameR',1]].forEach(([id,p])=>{const i=$(id);i.value=S.names[p];i.addEventListener('input',()=>{S.names[p]=i.value;if(Online.on?p===Online.me:p===0)S.me=i.value;else if(!Online.on)S.opp=i.value;Online.setName(p);renderInfo();if(!S.busy)renderPlay()})});
   const sel=$('gameSel');
-  GAMES.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>sel.append(el('option',{value:g.id},g.name)));
+  const open=GAMES.filter(g=>playable(g.id));
+  open.sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>sel.append(el('option',{value:g.id},g.name)));
+  sel.closest('.pick').hidden=open.length<2;
+  $('surprise').hidden=open.length<2;
   sel.addEventListener('change',()=>startGame(sel.value));
   [0,1].forEach(p=>$('f'+p).addEventListener('click',()=>{if(S.hist.length||S.busy)return;S.starter=p;S.state.turn=p;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first')}));
   $('undo').addEventListener('click',()=>{if(!S.hist.length||S.busy||!Online.mayUndo()||S.game.noUndo)return;S.state=S.hist.pop();S.who.pop();S.ui={};Sound.fx('undo');renderPlay(true);Online.push('undo')});

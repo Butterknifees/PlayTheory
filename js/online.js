@@ -130,7 +130,7 @@ const Online=(()=>{
   }
   function apply(r){
     let d;try{d=JSON.parse(r.snap)}catch(e){return}
-    const g=GAMES.find(x=>x.id===d.gid);if(!g) return;
+    const g=GAMES.find(x=>x.id===d.gid);if(!g||!playable(g.id)) return;
     applying=true;
     try{
       clearTimeout(replayT);

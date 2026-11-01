@@ -4,6 +4,8 @@ Two players, one screen. Challenge a friend, unwind, or keep your brain sharp.
 
 PlayTheory opens on a page of game cards: pick one (or tap **Surprise me**), read its rules, watch a short demo, and play. The featured game, **Duo Sudoku**, gets a big card at the top: a shared sudoku with ×2/×3 bonus squares, at Medium or Hard. A number scores either its own value or, with scoring by difficulty, a value ranked by how many copies of it are still to place. By default both players race in rapid fire against a 10-minute game clock (3 and 5 minutes are options too); they can also take turns with a 30-second turn limit. There are 35 games in all, including Nim, Domineering, Hackenbush, Amazons, Hex, Dots & Boxes, Toppling Dominoes and Clobber. Every game has its own music, sounds and animations, and a themed board (trains, frogs, bowling pins, chocolate, marble queens and more). Use the **Themed** button to switch to a plain look.
 
+**Right now only Duo Sudoku is open.** Every other card says *Coming soon* and can't be started. To open another game, add its `id` to `PLAYABLE` in `js/app.js`.
+
 **Play it:** open `index.html` in a browser, or visit the GitHub Pages site. It works on phones too: boards shrink to fit, the rules and demo open from **How to play**, and moves that show a preview take two taps (look, then play).
 
 **Play on two devices:** tap **Play online → Challenge a friend** and send the link. Your friend opens it and plays black on their own phone or computer. This needs a free Firebase project; see [ONLINE.md](ONLINE.md).
@@ -27,6 +29,10 @@ Plain HTML, CSS and JavaScript. No build step and no dependencies.
 | `database.rules.json` | Security rules to paste into the Firebase console |
 | `js/demo.js` | The "Watch a round" demo that plays real games on a loop |
 | `js/app.js` | The game table: dealing, turns, intro screens, sound controls |
+
+### Search pages
+
+`duo-sudoku/` and `games-like-chess/` are plain landing pages for search engines (styles in `css/page.css`). `robots.txt`, `sitemap.xml`, `og-image.png` (the link preview) and the icons sit at the top level. When you add a page, add it to `sitemap.xml` too.
 
 ### Adding a game
 
