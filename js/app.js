@@ -295,7 +295,7 @@ function askNames(join){
     const draw=()=>{oppRow.hidden=away;sw.hidden=join;sw.textContent=away?'We’re sharing this screen':'My opponent is on another device';
       go.disabled=!me.value.trim()||(!away&&!opp.value.trim())};
     f.replaceChildren(el('h2',{},join?'You’ve been challenged!':'Who’s playing?'),
-      el('p',{},join?'Tell your friend who you are.':'Add both names. They’re used for the rest of the game until you refresh the page.'),
+      el('p',{},join?'Tell your friend who you are.':'Add both names. They’re used in every game you play here until you refresh the page.'),
       el('label',{class:'name-row'},join?null:el('span',{class:'dot l'}),me),oppRow,sw,go);
     me.addEventListener('input',draw);opp.addEventListener('input',draw);
     sw.addEventListener('click',()=>{away=!away;draw();(away?go:opp).focus()});
