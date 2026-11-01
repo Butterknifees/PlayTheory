@@ -12,7 +12,7 @@ function lock(on){S.busy=on;$('board').classList.toggle('busy',on)}
 
 /* the ctx object every game render receives */
 const ctx={
-  get live(){return !S.over&&!S.busy},
+  get live(){return !S.over&&!S.busy&&Online.mayMove()},
   get ui(){return S.ui},
   async play(next,anim,opt={}){
     if(S.over||S.busy) return;
@@ -20,8 +20,9 @@ const ctx={
     if(!opt.silent) Sound.fx(S.game.sfx,{p:mover});
     if(anim){lock(true);try{await anim()}catch(e){console.error(e)}lock(false)}
     if(S.state!==base) return; // the game changed while the animation ran
-    S.hist.push(S.state);S.state=next;S.ui={};
+    S.hist.push(S.state);S.who.push(mover);S.state=next;S.ui={};
     renderPlay(true);
+    Online.push('move');
     if(S.over) celebrate();
   },
   async busy(fn){ // animate something that is not a full move yet (e.g. the amazon stepping)
@@ -58,7 +59,8 @@ function renderPlay(moved){
   const s=S.state,over=S.over;
   $('play').dataset.turn=over?'':s.turn;
   const t=$('turn');t.className='turn t'+s.turn+(moved?' bump':'');
-  t.replaceChildren(...(over?[el('span',{},'Game over')]:[el('span',{class:'dot'}),el('span',{},`${name(s.turn)} to move`)]));
+  const mine=Online.on&&s.turn===Online.me,waiting=Online.on&&!over&&!mine;
+  t.replaceChildren(...(over?[el('span',{},'Game over')]:[el('span',{class:'dot'}),el('span',{},mine?'Your move':`${name(s.turn)} to move`)]));
   const started=S.hist.length>0;
   [0,1].forEach(p=>{const b=$('f'+p);b.textContent=name(p);b.setAttribute('aria-pressed',String(S.starter===p));b.disabled=started});
   const res=$('result');
@@ -66,7 +68,7 @@ function renderPlay(moved){
     const w=over.winner;res.hidden=false;res.className='result'+(w==='draw'?'':' w'+w);
     const again=el('button',{class:'btn',type:'button'},'Play again');again.addEventListener('click',()=>newPosition(true));
     const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Next random game →');nxt.addEventListener('click',nextRandom);
-    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':`${name(w)} wins`),el('p',{},over.reason)),el('div',{class:'row'},again,nxt));
+    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},over.reason)),el('div',{class:'row'},again,nxt));
   }else res.hidden=true;
   S.hint=null;
   const board=$('board');
@@ -75,8 +77,8 @@ function renderPlay(moved){
   Skins.decorate(S.gid,board);
   fitBox(board);
   armed=null;
-  $('hint').textContent=touchify(pn(S.hint??S.game.how),board.querySelector('[data-hov]'));
-  $('undo').disabled=!started||S.busy;
+  $('hint').textContent=waiting?`Waiting for ${name(s.turn)} to move…`:touchify(pn(S.hint??S.game.how),board.querySelector('[data-hov]'));
+  $('undo').disabled=!started||S.busy||!Online.mayUndo();
   if(S.entering){S.entering=false;enterBoard()}
 }
 
@@ -122,12 +124,13 @@ function updateNowPlaying(){
   $('lookBtn').setAttribute('aria-pressed',String(Skins.on));
 }
 
-function newPosition(animate){
-  S.state=S.game.create();S.state.turn=S.starter;S.hist=[];S.ui={};S.busy=false;
+function newPosition(animate,dealt){
+  S.state=S.game.create();S.state.turn=S.starter;S.hist=[];S.who=[];S.ui={};S.busy=false;
   renderInfo();S.entering=!!animate;renderPlay();
   Demo.start(S.game,$('demoBox'),$('demoCap'));
+  if(!dealt) Online.push('new');
 }
-function startGame(id){closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false);showIntro()}
+function startGame(id){closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false,true);showIntro();Online.push('game')}
 function nextRandom(){
   if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>id!==S.gid));
   startGame(S.bag.pop());
@@ -184,12 +187,12 @@ function swipeToClose(handle,sheet){
 }
 
 function boot(){
-  [['nameL',0],['nameR',1]].forEach(([id,p])=>{const i=$(id);i.value=S.names[p];i.addEventListener('input',()=>{S.names[p]=i.value;renderInfo();if(!S.busy)renderPlay()})});
+  [['nameL',0],['nameR',1]].forEach(([id,p])=>{const i=$(id);i.value=S.names[p];i.addEventListener('input',()=>{S.names[p]=i.value;Online.setName(p);renderInfo();if(!S.busy)renderPlay()})});
   const sel=$('gameSel');
   GAMES.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>sel.append(el('option',{value:g.id},g.name)));
   sel.addEventListener('change',()=>{S.bag=S.bag.filter(x=>x!==sel.value);startGame(sel.value)});
-  [0,1].forEach(p=>$('f'+p).addEventListener('click',()=>{if(S.hist.length||S.busy)return;S.starter=p;S.state.turn=p;S.ui={};Sound.fx('pick');renderPlay(true)}));
-  $('undo').addEventListener('click',()=>{if(!S.hist.length||S.busy)return;S.state=S.hist.pop();S.ui={};Sound.fx('undo');renderPlay(true)});
+  [0,1].forEach(p=>$('f'+p).addEventListener('click',()=>{if(S.hist.length||S.busy)return;S.starter=p;S.state.turn=p;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first')}));
+  $('undo').addEventListener('click',()=>{if(!S.hist.length||S.busy||!Online.mayUndo())return;S.state=S.hist.pop();S.who.pop();S.ui={};Sound.fx('undo');renderPlay(true);Online.push('undo')});
   $('restart').addEventListener('click',()=>{if(!S.busy)newPosition(true)});
   $('next').addEventListener('click',nextRandom);
   $('musicBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('music',!Sound.pref.music);if(Sound.pref.music&&$('intro').hidden)Music.play(S.gid);else if(!Sound.pref.music)Music.stop();updateNowPlaying()}));
@@ -206,5 +209,6 @@ function boot(){
   let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{fitBox($('board'));fitBox($('demoBox'));if(!narrow())closeSheet()},120)});
   updateNowPlaying();
   nextRandom();
+  Online.init();
 }
 if(typeof document!=='undefined') boot();

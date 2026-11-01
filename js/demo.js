@@ -67,5 +67,5 @@ const Demo=(()=>{
       st=next;timer=setTimeout(()=>step(my),1050);
     },750);
   }
-  return {start,stop};
+  return {start,stop,mark};
 })();

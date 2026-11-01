@@ -6,6 +6,8 @@ PlayTheory deals you a random game, shows its rules and a short demo, and lets t
 
 **Play it:** open `index.html` in a browser, or visit the GitHub Pages site. It works on phones too: boards shrink to fit, the rules and demo open from **How to play**, and moves that show a preview take two taps (look, then play).
 
+**Play on two devices:** tap **Play online → Challenge a friend** and send the link. Your friend opens it and plays black on their own phone or computer. This needs a free Firebase project; see [ONLINE.md](ONLINE.md).
+
 ## How it is built
 
 Plain HTML, CSS and JavaScript. No build step and no dependencies.
@@ -20,6 +22,9 @@ Plain HTML, CSS and JavaScript. No build step and no dependencies.
 | `js/fx.js` | Particle effects (the Amazons flaming arrow, captures, confetti) |
 | `js/audio.js` | Generated music themes for every game, and sound effects |
 | `js/skins.js` | Themed boards: the drawn pieces and per-game table styles. Classic mode turns it off |
+| `js/online.js` | Challenge links: syncs a match between two devices through Firebase |
+| `js/firebase-config.js` | Your Firebase project config (empty until online play is set up) |
+| `database.rules.json` | Security rules to paste into the Firebase console |
 | `js/demo.js` | The "Watch a round" demo that plays real games on a loop |
 | `js/app.js` | The game table: dealing, turns, intro screens, sound controls |
 
