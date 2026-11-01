@@ -1,6 +1,6 @@
 # Turning on online play
 
-**Play online** lets two people play the same game on two devices. One player taps **Challenge a friend** and sends the link. The friend opens it and plays black on their own device. Moves, undo, new positions, new games and names all sync live.
+**Play online** lets two people play the same game on two devices. One player taps **Challenge a friend** and sends the link, or taps **Make a room** and tells their friend the 5-letter code. The friend opens the link, or taps **Play online → Join a room** and types the code, and plays black on their own device. Moves, undo, new positions, new games and names all sync live.
 
 Online play needs a free Firebase project. You set it up once and it takes about ten minutes. Until it's set up, the site still works as a one-screen game and the online button explains that online play isn't switched on.
 
@@ -22,7 +22,7 @@ Players never make accounts. Each device gets an anonymous ID, so a match knows 
 1. Go to **Build → Realtime Database → Create database**. Pick the location nearest to you and start in **locked mode**.
 2. Open the **Rules** tab and replace everything there with the contents of [`database.rules.json`](database.rules.json). Click **Publish**.
 
-   These rules let only the person who created a challenge and the one friend who accepted it read or change that match.
+   These rules let only the person who created a challenge and the one friend who accepted it read or change that match. They also let room codes point at a match. If you set up the rules before room codes existed, paste them again; until you do, **Make a room** still works but only gives a link.
 
 ## 4. Connect the site
 
