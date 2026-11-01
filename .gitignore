@@ -1,0 +1,5 @@
+# Claude's own working notes and tools. Never commit them: GitHub Pages would publish them on the site.
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.DS_Store

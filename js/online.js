@@ -164,13 +164,14 @@ const Online=(()=>{
     applying=true;
     try{
       clearTimeout(replayT);
-      const prev=S.state,same=!fresh&&r.kind!=='game'&&d.gid===S.gid,free=same&&g.anyTurn&&g.anyTurn(d.state);
+      const prev=S.state,same=!fresh&&r.kind!=='game'&&d.gid===S.gid,free=same&&g.anyTurn&&g.anyTurn(d.state),joined=fresh;
       fresh=false;
       S.state=d.state;S.hist=d.hist||[];S.who=d.who||[];S.starter=d.starter||0;
       if(!free) S.ui={};
       if(!same){
         S.gid=d.gid;S.game=g;closeSheet();S.sawHow=false;lock(false);
         renderInfo();renderPlay();Demo.start(g,$('demoBox'),$('demoCap'));showIntro();
+        if(joined) enterGame(); // just joined by code or link: straight to the board, no intro to tap through
       }else if(free){renderPlay();if(S.over)celebrate()} // everyone plays at once: no replay, keep your selection
       else if(r.kind==='move'&&prev){renderInfo();replay(prev,d.state,r.by)}
       else{lock(false);renderInfo();S.entering=r.kind==='new';renderPlay(true);Sound.fx(r.kind==='undo'?'undo':'pick')}
