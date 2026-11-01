@@ -67,7 +67,7 @@ function syncMusic(){
 
 /* once the first move is made, everything but the game itself steps aside until the game ends */
 function syncFocus(){
-  const on=document.body.dataset.view==='play'&&S.hist.length>0&&!S.over;
+  const on=document.body.dataset.view==='play'&&(S.hist.length>0||!!(S.game.ready&&S.game.ready(S.state)))&&!S.over;
   if(on===document.body.classList.contains('focus')) return;
   document.body.classList.toggle('focus',on);
   if(on) try{window.scrollTo({top:0})}catch(e){}
