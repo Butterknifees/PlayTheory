@@ -22,7 +22,7 @@ const ctx={
     if(S.state!==base) return; // the game changed while the animation ran
     S.hist.push(S.state);S.who.push(mover);S.state=next;S.ui={};
     renderPlay(true);
-    Online.push('move');
+    Online.push('move',opt.op);
     if(S.over) celebrate();
   },
   async busy(fn){ // animate something that is not a full move yet (e.g. the amazon stepping)
@@ -64,9 +64,10 @@ function renderPlay(moved){
   const s=S.state,over=S.over;
   $('play').dataset.turn=over?'':s.turn;
   const t=$('turn');t.className='turn t'+s.turn+(moved?' bump':'');
-  const mine=Online.on&&s.turn===Online.me,waiting=Online.on&&!over&&!mine;
-  t.replaceChildren(...(over?[el('span',{},'Game over')]:[el('span',{class:'dot'}),el('span',{},mine?'Your move':`${name(s.turn)} to move`)]));
+  const free=!!(S.game.anyTurn&&S.game.anyTurn(s)),mine=Online.on&&s.turn===Online.me,waiting=Online.on&&!over&&!mine&&!free;
+  t.replaceChildren(...(over?[el('span',{},'Game over')]:[el('span',{class:'dot'}),el('span',{},S.game.status&&S.game.status(s)||(mine?'Your move':`${name(s.turn)} to move`))]));
   const started=S.hist.length>0;
+  $('f0').parentElement.hidden=free;
   [0,1].forEach(p=>{const b=$('f'+p);b.textContent=name(p);b.setAttribute('aria-pressed',String(S.starter===p));b.disabled=started});
   const res=$('result');
   if(over){

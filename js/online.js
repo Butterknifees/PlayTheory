@@ -9,7 +9,7 @@ const Online=(()=>{
   const SDK='https://cdn.jsdelivr.net/npm/firebase@10.12.2/';
   const ID_CHARS='abcdefghijkmnpqrstuvwxyz23456789',CODE_CHARS='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const st={on:false,me:0};
-  let db=null,uid=null,ref=null,id=null,seq=0,lastTok=null,applying=false,fresh=false,match=null,sdkP=null,nameT=null,replayT=null,err='',busyMsg='',mode='link',codeDraft='';
+  let db=null,uid=null,ref=null,id=null,seq=0,lastTok=null,lastData=null,offset=0,applying=false,fresh=false,match=null,sdkP=null,nameT=null,replayT=null,err='',busyMsg='',mode='link',codeDraft='';
   const configured=()=>typeof FIREBASE_CONFIG!=='undefined'&&!!FIREBASE_CONFIG&&!!FIREBASE_CONFIG.apiKey;
   const other=()=>1-st.me;
   const link=()=>location.origin+location.pathname+'?vs='+id;
@@ -23,6 +23,7 @@ const Online=(()=>{
       if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       const cred=await firebase.auth().signInAnonymously();
       uid=cred.user.uid;db=firebase.database();
+      db.ref('.info/serverTimeOffset').on('value',s=>{offset=s.val()||0});
     })();
     sdkP.catch(()=>{sdkP=null});
     return sdkP;
@@ -92,12 +93,18 @@ const Online=(()=>{
   }
 
   /* ---------- sending ---------- */
-  function push(kind){
+  /* op, when given, re-applies this move on top of a newer state, so two moves made at the same
+     moment (rapid fire) are merged instead of one being lost */
+  function push(kind,op){
     if(!st.on||applying||!ref) return;
-    const base=seq,data=snap(),tok=uid+':'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);lastTok=tok;
+    const base=seq,data=snap(),tok=uid+':'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);lastTok=tok;lastData=data;
     ref.transaction(r=>{
-      if(!r||(r.seq||0)!==base) return;
-      r.seq=base+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=data;return r;
+      if(!r) return;
+      if((r.seq||0)===base){r.seq=base+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=data;return r}
+      if(!op) return;
+      let d;try{d=JSON.parse(r.snap)}catch(e){return}
+      const n=op(d.state);if(!n) return;
+      d.state=n;r.seq=(r.seq||0)+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=JSON.stringify(d);return r;
     }).catch(e=>note('Could not send that: '+e.message));
   }
   function setName(p){
@@ -116,7 +123,7 @@ const Online=(()=>{
     if(!S.names[st.me]&&mine){S.names[st.me]=mine;renamed=true}
     if((r.seq||0)>seq){
       seq=r.seq;
-      if(r.tok!==lastTok||fresh) apply(r); // our own write echoing back needs no replay
+      if(r.tok!==lastTok||r.snap!==lastData||fresh) apply(r); // our own write echoing back unchanged needs no replay
     }else if(renamed){renderInfo();if(!S.busy)renderPlay()}
     names();bar();
   }
@@ -126,13 +133,15 @@ const Online=(()=>{
     applying=true;
     try{
       clearTimeout(replayT);
-      const prev=S.state,same=!fresh&&r.kind!=='game'&&d.gid===S.gid;
+      const prev=S.state,same=!fresh&&r.kind!=='game'&&d.gid===S.gid,free=same&&g.anyTurn&&g.anyTurn(d.state);
       fresh=false;
-      S.state=d.state;S.hist=d.hist||[];S.who=d.who||[];S.starter=d.starter||0;S.ui={};
+      S.state=d.state;S.hist=d.hist||[];S.who=d.who||[];S.starter=d.starter||0;
+      if(!free) S.ui={};
       if(!same){
         S.gid=d.gid;S.game=g;closeSheet();S.sawHow=false;lock(false);
         renderInfo();renderPlay();Demo.start(g,$('demoBox'),$('demoCap'));showIntro();
-      }else if(r.kind==='move'&&prev){renderInfo();replay(prev,d.state,r.by)}
+      }else if(free){renderPlay();if(S.over)celebrate()} // everyone plays at once: no replay, keep your selection
+      else if(r.kind==='move'&&prev){renderInfo();replay(prev,d.state,r.by)}
       else{lock(false);renderInfo();S.entering=r.kind==='new';renderPlay(true);Sound.fx(r.kind==='undo'?'undo':'pick')}
     }finally{applying=false}
   }
@@ -151,7 +160,7 @@ const Online=(()=>{
   }
 
   /* ---------- what the rest of the app asks ---------- */
-  const mayMove=()=>!st.on||(S.state&&S.state.turn===st.me);
+  const mayMove=()=>!st.on||!!(S.state&&(S.state.turn===st.me||(S.game&&S.game.anyTurn&&S.game.anyTurn(S.state))));
   const mayUndo=()=>!st.on||(S.who.length>0&&S.who[S.who.length-1]===st.me);
   const friendHere=()=>!!(match&&match.guest&&match.online&&match.online[PC[other()]]);
   const friendJoined=()=>!!(match&&match.guest);
@@ -256,5 +265,5 @@ const Online=(()=>{
       open();run('Joining the challenge…',()=>accept(m).then(close));
     }
   }
-  return {init,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get me(){return st.me}};
+  return {init,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get me(){return st.me},get offset(){return offset}};
 })();

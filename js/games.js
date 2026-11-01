@@ -673,113 +673,139 @@ const SDK={
     return{grid,sol};
   }
 };
-const sdkMoves=s=>s.own.filter(o=>o>=0).length+s.tried.join('').length+s.out[0]+s.out[1];
-function sdkPlace(s,i,d,spent){
-  const p=s.turn,n=clone(s),ok=s.sol[i]===d,pts=ok?d*s.boost[i]:-1;
+/* two ways to play: take turns (30 s a turn, optional clock each), or rapid fire (everyone at once, one game clock) */
+const sdkNow=()=>Date.now()+(typeof Online!=='undefined'?Online.offset:0);
+const sdkCount=s=>s.n+s.out[0]+s.out[1]+(s.skips||0);
+function sdkPlace(s,i,d,spent,p=s.turn){
+  const n=clone(s),ok=s.sol[i]===d,pts=ok?d*s.boost[i]:-1;
+  if(ok){n.grid[i]=d;n.own[i]=p}
+  n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n};
+  if(s.mode==='rapid'){if(!n.deadline&&n.limit)n.deadline=sdkNow()+n.limit;return n}
   if(n.limit&&spent) n.clock[p]=Math.max(0,n.clock[p]-spent);
-  if(ok){n.grid[i]=d;n.own[i]=p}else n.tried[i]+=d;
-  n.score[p]+=pts;n.last={i,d,ok,p,pts};
   n.turn=n.out[1-p]?p:1-p;
   return n;
 }
 function sdkTimeout(s){const p=s.turn,n=clone(s);n.clock[p]=0;n.out[p]=1;n.last={timeout:p};n.turn=1-p;return n}
+function sdkSkip(s,spent){const p=s.turn,n=clone(s);if(n.limit)n.clock[p]=Math.max(0,n.clock[p]-spent);n.skips=(n.skips||0)+1;n.last={skip:p,k:n.skips};n.turn=n.out[1-p]?p:1-p;return n}
 const sdkFmt=ms=>{const t=Math.max(0,Math.ceil(ms/1000));return`${t/60|0}:${String(t%60).padStart(2,'0')}`};
-/* the running clock lives outside the state: it restarts whenever the turn changes */
-const sdkClock={key:'',t:0,timeout:null};
-const sdkSpent=s=>s.limit&&sdkMoves(s)>0&&sdkClock.key?Date.now()-sdkClock.t:0;
+/* the running turn clock lives outside the state: it restarts whenever the turn changes */
+const sdkClock={key:'',t:0,timeout:null},sdkFx={key:''};
+const sdkSpent=s=>s.mode!=='rapid'&&sdkCount(s)>0&&sdkClock.key?Date.now()-sdkClock.t:0;
+const sdkOnline=()=>typeof Online!=='undefined'&&Online.on;
+/* the little +points or −1 that pops out of a square, for your moves and your friend's */
+function sdkEffect(l){
+  if(!l||l.i==null){if(l&&(l.skip!=null||l.timeout!=null))Sound.fx('bell');return}
+  const cell=document.querySelector(`#board .sc[data-i="${l.i}"]`);if(!cell)return;
+  cell.append(el('span',{class:'sdk-float'+(l.ok?' f'+l.p:' bad')},l.ok?'+'+l.pts:'−1'));
+  if(l.ok){Sound.fx(l.pts>l.d?'coin':'pop',{p:l.p});FX.burstAt(cell,[FX.color(PC[l.p]),'#ffd27a','#ffffff'],l.pts>l.d?34:16,{speed:l.pts>l.d?190:120})}
+  else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p:l.p});setTimeout(()=>cell.classList.remove('bad'),600)}
+}
 
 def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
-  blurb:'One sudoku, two players, bonus squares. Every number you get right scores; every miss costs you.',
-  rules:['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.','Players take turns placing one number in any empty square.','A correct number scores its value. On a ×2 or ×3 square it scores double or triple.','A wrong number scores −1 and is crossed out in that square, so nobody can try it there again.','With a timer, each player has their own clock that runs only on their turn. If yours runs out, you stop and your opponent plays on alone.'],
-  win:'When the board is full, or both clocks have run out, the higher score wins. A tie is possible.',
+  blurb:'One sudoku, two players, bonus squares. Take turns, or race each other in rapid fire.',
+  rules:s=>['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
+    'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty.',
+    'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.',
+    'Rapid fire: no turns. Both players place numbers as fast as they like until the board is full or the 3 or 5 minute game clock ends.'],
+  win:'When the board is full or time is up, the higher score wins. A tie is possible.',
   how:'Click an empty square, then a number.',
   create:()=>{
     const {grid,sol}=SDK.make(R(32,36)),boost=Array(81).fill(1);
     const empty=shuffle(grid.map((d,i)=>d?-1:i).filter(i=>i>=0));
     empty.slice(0,4).forEach(i=>boost[i]=3);empty.slice(4,12).forEach(i=>boost[i]=2);
-    return{grid,sol,given:grid.map(d=>d?1:0),boost,own:Array(81).fill(-1),tried:Array(81).fill(''),score:[0,0],out:[0,0],limit:0,clock:[0,0],last:null};
+    return{grid,sol,given:grid.map(d=>d?1:0),boost,own:Array(81).fill(-1),score:[0,0],n:0,last:null,
+      mode:'turns',turnLimit:30000,limit:0,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0};
   },
-  moves:s=>s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].filter(d=>!s.tried[i].includes(d)).map(d=>sdkPlace(s,i,d,0))),
-  hasMove:(s,p)=>!s.out[p]&&s.grid.includes(0),
+  moves:s=>s.mode==='rapid'||s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].map(d=>sdkPlace(s,i,d,0))),
+  hasMove:(s,p)=>s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
+  anyTurn:s=>s.mode==='rapid',
+  status:s=>s.mode==='rapid'?'Rapid fire: both play at once':null,
   demoMove:s=>{
     const empty=s.grid.map((v,i)=>v?-1:i).filter(i=>i>=0);
     const i=Math.random()<.35?(empty.find(i=>s.boost[i]>1)??pick(empty)):pick(empty);
-    const wrong=[1,2,3,4,5,6,7,8,9].filter(d=>d!==s.sol[i]&&!s.tried[i].includes(d));
-    return sdkPlace(s,i,Math.random()<.72||!wrong.length?s.sol[i]:pick(wrong),0);
+    return sdkPlace(s,i,Math.random()<.75?s.sol[i]:pick([1,2,3,4,5,6,7,8,9].filter(d=>d!==s.sol[i])),0);
   },
   result:s=>{
-    if(s.grid.includes(0)&&!(s.out[0]&&s.out[1])) return null;
-    const [a,b]=s.score,tally=`Points: ${name(0)} ${a}, ${name(1)} ${b}.`;
+    const timeUp=s.mode==='rapid'?s.ended:s.out[0]&&s.out[1];
+    if(s.grid.includes(0)&&!timeUp) return null;
+    const [a,b]=s.score,tally=`${timeUp&&s.grid.includes(0)?'Time is up. ':''}Points: ${name(0)} ${a}, ${name(1)} ${b}.`;
     return a===b?{winner:'draw',reason:tally}:{winner:a>b?0:1,reason:tally};
   },
   render(s,ctx){
-    const p=s.turn,app=typeof ctx.configure==='function',started=sdkMoves(s)>0,sel=ctx.ui.sel;
+    const p=s.turn,app=typeof ctx.configure==='function',rapid=s.mode==='rapid',started=s.n>0,sel=ctx.ui.sel;
     if(app){
-      const key=sdkMoves(s)+':'+p;
+      const key=sdkCount(s)+':'+p;
       if(key!==sdkClock.key){sdkClock.key=key;sdkClock.t=Date.now()}
-      sdkClock.timeout=()=>ctx.play(sdkTimeout(s),async()=>{Sound.fx('bell')},{silent:true});
+      sdkClock.timeout=rapid
+        ?()=>ctx.play({...clone(s),ended:1},null,{silent:true,op:st=>st.ended?null:{...st,ended:1}})
+        :()=>{const spent=Date.now()-sdkClock.t,out=s.limit&&s.clock[p]-spent<=0;ctx.play(out?sdkTimeout(s):sdkSkip(s,spent),null,{silent:true})};
+      if(s.last){const k=JSON.stringify(s.last);if(k!==sdkFx.key){const seen=sdkFx.key!=='';sdkFx.key=k;if(seen)setTimeout(()=>sdkEffect(s.last),0)}}
+      else sdkFx.key='-';
     }
-    const wrap=el('div',{class:'sdk'});
+    const wrap=el('div',{class:'sdk'+(rapid?' rapid':'')});
 
-    /* before the first move: choose the timer (and see what scoring is coming) */
+    /* before the first number: how to play, and the clocks */
     if(app&&!started){
-      const opt=(label,ms)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(s.limit===ms)},label);
-        b.disabled=!ctx.live;b.addEventListener('click',()=>ctx.configure({...clone(s),limit:ms,clock:[ms,ms]}));return b};
-      wrap.append(el('div',{class:'sdk-setup'},
-        el('div',{class:'sdk-opt'},el('span',{class:'role'},'Timer'),opt('Off',0),opt('3 min each',180000),opt('5 min each',300000)),
-        el('div',{class:'sdk-opt'},el('span',{class:'role'},'Scoring'),el('button',{class:'seg',type:'button','aria-pressed':'true'},'Number × booster'),
-          el('button',{class:'seg',type:'button',disabled:'',title:'Points based on how hard each square was to work out'},'By difficulty ',el('span',{class:'soon'},'Coming soon')))));
+      const pick2=(label,on,next)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(on)},label);
+        b.disabled=!ctx.live;b.addEventListener('click',()=>{if(!on)ctx.configure({...clone(s),...next})});return b};
+      const row=(label,...b)=>el('div',{class:'sdk-opt'},el('span',{class:'role'},label),...b);
+      const rows=[row('Mode',pick2('Take turns',!rapid,{mode:'turns',limit:0,clock:[0,0]}),pick2('Rapid fire',rapid,{mode:'rapid',limit:180000,clock:[0,0]}))];
+      if(rapid) rows.push(row('Game time',pick2('3 min',s.limit===180000,{limit:180000}),pick2('5 min',s.limit===300000,{limit:300000})));
+      else rows.push(row('Per turn',pick2('30 s',!!s.turnLimit,{turnLimit:30000}),pick2('No limit',!s.turnLimit,{turnLimit:0})),
+        row('Clock',pick2('Off',!s.limit,{limit:0,clock:[0,0]}),pick2('3 min each',s.limit===180000,{limit:180000,clock:[180000,180000]}),pick2('5 min each',s.limit===300000,{limit:300000,clock:[300000,300000]})));
+      rows.push(row('Scoring',el('button',{class:'seg',type:'button','aria-pressed':'true'},'Number × booster'),
+        el('button',{class:'seg',type:'button',disabled:'',title:'Points based on how hard each square was to work out'},'By difficulty ',el('span',{class:'soon'},'Coming soon'))));
+      wrap.append(el('div',{class:'sdk-setup'},...rows));
     }
 
     /* scores and clocks */
-    const pill=q=>el('div',{class:'sdk-score s'+q+(p===q&&!s.out[q]?' on':'')+(s.out[q]?' out':'')},
+    const pill=q=>el('div',{class:'sdk-score s'+q+(!rapid&&p===q&&!s.out[q]?' on':'')+(s.out[q]?' out':'')},
       el('span',{class:'dot'}),el('span',{class:'nm'},name(q)),el('b',{},String(s.score[q])),
-      s.limit?el('span',{class:'sdk-clock','data-p':q},s.out[q]?'Time’s up':sdkFmt(s.clock[q]-(app&&started&&q===p?Date.now()-sdkClock.t:0))):null);
+      !rapid&&s.limit?el('span',{class:'sdk-clock','data-p':q},s.out[q]?'Time’s up':sdkFmt(s.clock[q]-(app&&started&&q===p?Date.now()-sdkClock.t:0))):null);
     wrap.append(el('div',{class:'sdk-scores'},pill(0),pill(1)));
+    if(rapid) wrap.append(el('div',{class:'sdk-gclock'+(s.deadline?'':' idle')},s.deadline?sdkFmt(s.deadline-sdkNow()):`${sdkFmt(s.limit)} · starts with the first number`));
+    else if(s.turnLimit&&started) wrap.append(el('div',{class:'sdk-turnbar t'+p},el('div',{class:'trk'},el('i',{style:`--w:${Math.max(0,100-(Date.now()-sdkClock.t)/s.turnLimit*100)}%`})),el('span',{},Math.max(0,Math.ceil((s.turnLimit-(Date.now()-sdkClock.t))/1000))+'s')));
 
     /* the grid */
-    const grid=el('div',{class:'sdk-grid'}),cells=[],boxes=Array.from({length:9},()=>el('div',{class:'sdk-box'}));
+    const grid=el('div',{class:'sdk-grid'}),boxes=Array.from({length:9},()=>el('div',{class:'sdk-box'}));
     grid.append(...boxes);
     const selD=sel!=null?s.grid[sel]:0,peers=sel!=null?new Set(SDK.peers[sel]):null;
     for(let i=0;i<81;i++){
       const v=s.grid[i],open=!v&&ctx.live;
       const cls='sc'+(s.given[i]?' g':'')+(s.own[i]>=0?' o'+s.own[i]:'')+(s.boost[i]>1&&!s.given[i]?' b'+s.boost[i]:'')+
-        (i===sel?' sel':'')+(peers&&peers.has(i)?' peer':'')+(selD&&v===selD&&i!==sel?' same':'')+(s.last&&s.last.i===i?' last':'');
+        (i===sel?' sel':'')+(peers&&peers.has(i)?' peer':'')+(selD&&v===selD&&i!==sel?' same':'')+(s.last&&s.last.i===i&&s.last.ok?' last':'');
       const c=el(open||v?'button':'div',{class:cls,type:'button','data-i':i,'aria-label':`Row ${(i/9|0)+1}, column ${i%9+1}${v?', '+v:', empty'}${s.boost[i]>1&&!v?', times '+s.boost[i]:''}`});
-      if(!open&&!v) c.tabIndex=-1;
       if(v) c.append(el('span',{class:'dg'},String(v)));
-      else{
-        if(s.boost[i]>1) c.append(el('span',{class:'bb-tag'},'×'+s.boost[i]));
-        if(s.tried[i]) c.append(el('span',{class:'tr'},...[...s.tried[i]].map(d=>el('s',{},d))));
-      }
+      else if(s.boost[i]>1) c.append(el('span',{class:'bb-tag'},'×'+s.boost[i]));
       if(open||v) c.addEventListener('click',()=>{ctx.ui.sel=i;ctx.redraw()});
-      cells.push(c);boxes[((i/9|0)/3|0)*3+((i%9)/3|0)].append(c);
+      boxes[((i/9|0)/3|0)*3+((i%9)/3|0)].append(c);
     }
     wrap.append(grid);
 
-    /* the number pad */
-    const pad=el('div',{class:'sdk-pad'});
+    /* number pads: one for whoever is to move; in rapid fire one each (or just yours when online) */
     const done=d=>s.grid.filter(x=>x===d).length===9;
-    for(let d=1;d<=9;d++){
-      const b=el('button',{class:'key',type:'button','data-d':d,'aria-label':'Place '+d},String(d),el('small',{},done(d)?'✓':String(9-s.grid.filter(x=>x===d).length)));
-      b.disabled=!ctx.live||sel==null||!!s.grid[sel]||s.tried[sel].includes(d)||done(d);
-      b.addEventListener('click',()=>{
-        const i=sel,cell=cells[i],n=sdkPlace(s,i,d,sdkSpent(s)),hit=n.last.ok;
-        ctx.play(n,async()=>{
-          const fl=el('span',{class:'sdk-float'+(hit?' f'+p:' bad')},hit?'+'+n.last.pts:'−1');cell.append(fl);
-          if(hit){cell.classList.add('o'+p);cell.replaceChildren(el('span',{class:'dg'},String(d)),fl);
-            Sound.fx(s.boost[i]>1?'coin':'pop',{p});FX.burstAt(cell,[FX.color(PC[p]),'#ffd27a','#ffffff'],s.boost[i]>1?34:16,{speed:s.boost[i]>1?190:120})}
-          else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p})}
-          await sleep(hit?380:520);
-        },{silent:true});
-      });
-      pad.append(b);
-    }
-    wrap.append(pad);
+    const padFor=q=>{
+      const pad=el('div',{class:'sdk-pad'+(rapid?' p'+q:'')});
+      for(let d=1;d<=9;d++){
+        const b=el('button',{class:'key',type:'button','data-d':d,'data-p':q,'aria-label':`${rapid?name(q)+': ':''}place ${d}`},String(d),el('small',{},done(d)?'✓':String(9-s.grid.filter(x=>x===d).length)));
+        b.disabled=!ctx.live||sel==null||!!s.grid[sel]||done(d)||(!rapid&&q!==p);
+        b.addEventListener('click',()=>{
+          const i=sel;
+          ctx.play(sdkPlace(s,i,d,sdkSpent(s),q),null,{silent:true,op:st=>st.grid[i]||(st.mode==='rapid'&&st.ended)?null:sdkPlace(st,i,d,0,q)});
+        });
+        pad.append(b);
+      }
+      return rapid?el('div',{class:'sdk-padwrap p'+q},el('span',{class:'role'},el('span',{class:'dot'}),name(q)),pad):pad;
+    };
+    if(!rapid) wrap.append(padFor(p));
+    else if(sdkOnline()) wrap.append(el('div',{class:'sdk-pads one'},padFor(Online.me)));
+    else wrap.append(el('div',{class:'sdk-pads'},padFor(0),padFor(1)));
 
-    if(sel==null) ctx.say(`Click an empty square, then a number. A right number scores its value${s.limit?'':''}, times any booster. A wrong one costs 1 point.`);
+    if(rapid&&!s.ended) ctx.say(sel==null?'Both of you play at once. Click an empty square, then a number on your own pad.':`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
+    else if(sel==null) ctx.say(`Click an empty square, then a number. A right number scores its value, times any booster. A wrong one costs 1 point.${s.turnLimit?' You have 30 seconds a turn.':''}`);
     else if(!s.grid[sel]) ctx.say(`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
-    if(s.out[p]===0&&s.out[1-p]) ctx.say(`${name(1-p)} is out of time. ${name(p)} plays on alone.`);
+    if(!rapid&&s.last&&s.last.skip!=null&&sel==null) ctx.say(`${name(s.last.skip)} ran out of time for that turn. ${name(p)} is up.`);
+    if(!rapid&&s.out[p]===0&&s.out[1-p]) ctx.say(`${name(1-p)} is out of time. ${name(p)} plays on alone.`);
     return wrap;
   }});
 
@@ -789,7 +815,10 @@ if(typeof document!=='undefined'){
     if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||S.busy) return;
     if(e.target.closest&&e.target.closest('input,select,textarea,dialog')) return;
     const b=document.getElementById('board');if(!b||!b.offsetParent) return;
-    if(/^[1-9]$/.test(e.key)){const k=b.querySelector(`.sdk-pad button[data-d="${e.key}"]`);if(k&&!k.disabled){e.preventDefault();k.click()}return}
+    if(/^[1-9]$/.test(e.key)){
+      const s=S.state,q=s.mode!=='rapid'?s.turn:sdkOnline()?Online.me:0;
+      const k=b.querySelector(`.sdk-pad button[data-d="${e.key}"][data-p="${q}"]`);if(k&&!k.disabled){e.preventDefault();k.click()}return;
+    }
     const mv={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];
     if(mv==null) return;
     const i=S.ui.sel??40,j=i+mv;
@@ -798,12 +827,21 @@ if(typeof document!=='undefined'){
     const c=b.querySelector(`.sdk-grid .sc[data-i="${j}"]`);if(c)c.focus({preventScroll:true});
   });
   setInterval(()=>{
-    if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||!S.state.limit||S.over||S.busy) return;
-    const s=S.state,p=s.turn;if(!sdkMoves(s)||s.out[p]) return;
-    const left=s.clock[p]-(Date.now()-sdkClock.t);
-    document.querySelectorAll(`#board .sdk-clock[data-p="${p}"]`).forEach(e=>{e.textContent=sdkFmt(left);e.classList.toggle('low',left<30000)});
-    if(left>0||!sdkClock.timeout) return;
-    const mine=typeof Online==='undefined'||!Online.on||Online.me===p;
-    if(mine||left<-4000){const t=sdkClock.timeout;sdkClock.timeout=null;t()}
+    if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||S.over||S.busy) return;
+    const s=S.state,fire=()=>{const t=sdkClock.timeout;sdkClock.timeout=null;if(t)t()};
+    if(s.mode==='rapid'){
+      if(!s.deadline||s.ended) return;
+      const left=s.deadline-sdkNow();
+      document.querySelectorAll('#board .sdk-gclock').forEach(e=>{e.textContent=sdkFmt(left);e.classList.toggle('low',left<30000)});
+      if(left<=0) fire();
+      return;
+    }
+    const p=s.turn;if(!s.n||s.out[p]) return;
+    const spent=Date.now()-sdkClock.t,tot=s.limit?s.clock[p]-spent:Infinity,turn=s.turnLimit?s.turnLimit-spent:Infinity;
+    document.querySelectorAll(`#board .sdk-clock[data-p="${p}"]`).forEach(e=>{e.textContent=sdkFmt(tot);e.classList.toggle('low',tot<30000)});
+    document.querySelectorAll('#board .sdk-turnbar').forEach(e=>{e.querySelector('i').style.setProperty('--w',Math.max(0,turn/s.turnLimit*100)+'%');e.lastChild.textContent=Math.max(0,Math.ceil(turn/1000))+'s';e.classList.toggle('low',turn<10000)});
+    if(tot>0&&turn>0) return;
+    const mine=!sdkOnline()||Online.me===p;
+    if(mine||Math.min(tot,turn)<-4000) fire();
   },250);
 }

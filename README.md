@@ -2,7 +2,7 @@
 
 Two players, one screen. Challenge a friend, unwind, or keep your brain sharp.
 
-PlayTheory opens on a page of game cards: pick one (or tap **Surprise me**), read its rules, watch a short demo, and play. There are 35 games, including the new **Duo Sudoku** (a shared sudoku with ×2/×3 bonus squares, scoring and optional 3- or 5-minute clocks), including Nim, Domineering, Hackenbush, Amazons, Hex, Dots & Boxes, Toppling Dominoes and Clobber. Every game has its own music, sounds and animations, and a themed board (trains, frogs, bowling pins, chocolate, marble queens and more). Use the **Themed** button to switch to a plain look.
+PlayTheory opens on a page of game cards: pick one (or tap **Surprise me**), read its rules, watch a short demo, and play. There are 35 games, including the new **Duo Sudoku** (a shared sudoku with ×2/×3 bonus squares: take turns with a 30-second turn limit, or race in rapid fire against a 3- or 5-minute game clock), including Nim, Domineering, Hackenbush, Amazons, Hex, Dots & Boxes, Toppling Dominoes and Clobber. Every game has its own music, sounds and animations, and a themed board (trains, frogs, bowling pins, chocolate, marble queens and more). Use the **Themed** button to switch to a plain look.
 
 **Play it:** open `index.html` in a browser, or visit the GitHub Pages site. It works on phones too: boards shrink to fit, the rules and demo open from **How to play**, and moves that show a preview take two taps (look, then play).
 

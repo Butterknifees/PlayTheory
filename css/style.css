@@ -431,8 +431,6 @@ div.sc{cursor:default}
 .sc.bad{background:#fbd5d0!important}
 .bb-tag{position:absolute;top:2px;right:3px;font:800 calc(var(--sk)*.26) var(--f-display);color:#9a6a00;line-height:1}
 .sc.b3 .bb-tag{color:#b5530b}
-.tr{position:absolute;left:3px;bottom:2px;display:flex;flex-wrap:wrap;gap:1px;max-width:70%;font:600 calc(var(--sk)*.22) var(--f-mono);color:#c0392b;line-height:1}
-.tr s{text-decoration-thickness:1.5px}
 .sdk-float{position:absolute;left:50%;top:10%;transform:translate(-50%,0);font:900 calc(var(--sk)*.4) var(--f-display);pointer-events:none;animation:floatup .9s ease-out forwards;z-index:3;text-shadow:0 1px 0 #fff}
 .sdk-float.f0{color:var(--left)} .sdk-float.f1{color:var(--right)} .sdk-float.bad{color:#c0392b}
 @keyframes floatup{from{opacity:1;transform:translate(-50%,0) scale(.8)}to{opacity:0;transform:translate(-50%,-140%) scale(1.25)}}
@@ -442,6 +440,25 @@ div.sc{cursor:default}
 .sdk-pad .key:not(:disabled):hover{background:var(--left-soft);border-color:var(--left)}
 .sdk-pad .key:disabled{opacity:.35;cursor:default}
 .themed .board[data-game="duosudoku"] > *{rotate:none}
+.sdk-gclock{font:800 26px var(--f-mono);letter-spacing:.04em;padding:4px 16px;border-radius:12px;background:var(--ink);color:#fff}
+.sdk-gclock.idle{font:500 13px var(--f-mono);background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+.sdk-gclock.low{background:#c0392b;animation:livepulse 1s ease-in-out infinite}
+.sdk-turnbar{display:flex;align-items:center;gap:8px;width:100%;max-width:calc(var(--sk)*9 + 18px)}
+.sdk-turnbar .trk{position:relative;flex:1;height:10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.sdk-turnbar i{position:absolute;inset:0 auto 0 0;width:var(--w,100%);border-radius:999px;background:var(--left);transition:width .25s linear}
+.sdk-turnbar.t1 i{background:var(--right)}
+.sdk-turnbar span{font:700 13px var(--f-mono);color:var(--ink);min-width:3ch;text-align:right;background:rgba(255,255,255,.9);border-radius:6px;padding:1px 5px}
+.sdk-turnbar.low i{background:#c0392b}.sdk-turnbar.low span{color:#c0392b}
+.sdk-pads{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:calc(var(--sk)*9 + 18px)}
+.sdk-pads.one{grid-template-columns:1fr}
+.sdk-padwrap{display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:12px;border:2px solid var(--left);background:var(--surface)}
+.sdk-padwrap.p1{border-color:var(--right)}
+.sdk-padwrap .role{display:flex;align-items:center;gap:6px}
+.sdk-padwrap .dot{width:10px;height:10px;border-radius:50%;background:var(--left)} .sdk-padwrap.p1 .dot{background:var(--right)}
+.sdk-pads:not(.one) .sdk-pad{grid-template-columns:repeat(3,minmax(0,1fr));max-width:none}
+.sdk-pad.p0 .key:not(:disabled):hover{background:var(--left-soft);border-color:var(--left)}
+.sdk-pad.p1 .key:not(:disabled):hover{background:var(--right-soft);border-color:var(--right)}
+.demo-box .sdk-pads,.gprev .sdk-pads,.demo-box .sdk-turnbar,.gprev .sdk-turnbar,.gprev .sdk-gclock{display:none}
 .demo-box .sdk-pad,.demo-box .sdk-setup,.gprev .sdk-pad,.gprev .sdk-setup,.gprev .sdk-scores{display:none}
 .demo-box .sdk{--sk:22px}
 .demo-box .sdk-score{padding:4px 8px}.demo-box .sdk-score b{font-size:15px}
