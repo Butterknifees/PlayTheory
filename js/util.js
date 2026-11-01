@@ -18,7 +18,7 @@ const S={gid:null,game:null,state:null,hist:[],who:[],starter:0,over:null,ui:{},
 const name=p=>(S.names[p]||'').trim()||SIDE[p];
 /* swap the words Left and Right for the players' names, once they have typed them */
 const pn=t=>t==null?t:String(t).replace(/\bLeft\b/g,name(0)).replace(/\bRight\b/g,name(1));
-const KIND={Impartial:'Same moves for both',Partizan:'Blue vs black',Scoring:'Most boxes wins'};
+const KIND={Impartial:'Same moves for both',Partizan:'Blue vs black',Scoring:'Highest score wins'};
 const SOLVED={yes:'Solved: mathematicians have worked out perfect play for this game.',
   partly:'Partly solved: perfect play is known only for some small positions.',
   no:'Unsolved: nobody has worked out perfect play yet.'};

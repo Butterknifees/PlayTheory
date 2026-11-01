@@ -32,6 +32,10 @@ const ctx={
     lock(false);if(S.state===base) renderPlay();
   },
   redraw(){renderPlay()},
+  configure(next){ // change set-up options (like a timer) before the first move
+    if(S.hist.length||S.busy||!Online.mayMove()) return;
+    S.state=next;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first');
+  },
   say(m){S.hint=m}
 };
 
@@ -43,7 +47,7 @@ function celebrate(){
 }
 
 function renderInfo(){
-  const g=S.game;
+  const g=S.game;if(!g) return;
   $('gKind').textContent=KIND[g.kind]||g.kind;
   $('gRef').textContent=g.solved?SOLVED[g.solved]:'';
   $('gName').textContent=g.name;
@@ -55,6 +59,7 @@ function renderInfo(){
 }
 
 function renderPlay(moved){
+  if(!S.state) return;
   check();
   const s=S.state,over=S.over;
   $('play').dataset.turn=over?'':s.turn;
@@ -67,7 +72,7 @@ function renderPlay(moved){
   if(over){
     const w=over.winner;res.hidden=false;res.className='result'+(w==='draw'?'':' w'+w);
     const again=el('button',{class:'btn',type:'button'},'Play again');again.addEventListener('click',()=>newPosition(true));
-    const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Next random game →');nxt.addEventListener('click',nextRandom);
+    const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Choose another game');nxt.addEventListener('click',goHome);
     res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},over.reason)),el('div',{class:'row'},again,nxt));
   }else res.hidden=true;
   S.hint=null;
@@ -78,7 +83,8 @@ function renderPlay(moved){
   fitBox(board);
   armed=null;
   $('hint').textContent=waiting?`Waiting for ${name(s.turn)} to move…`:touchify(pn(S.hint??S.game.how),board.querySelector('[data-hov]'));
-  $('undo').disabled=!started||S.busy||!Online.mayUndo();
+  $('undo').disabled=!started||S.busy||!Online.mayUndo()||!!S.game.noUndo;
+  $('undo').hidden=!!S.game.noUndo;
   if(S.entering){S.entering=false;enterBoard()}
 }
 
@@ -93,6 +99,7 @@ function enterBoard(){
 /* the intro card shown when a new game is dealt */
 function showIntro(){
   const g=S.game,box=$('intro');let idx=0;
+  view('play');setRoute(g.id);
   const words=g.name.split(' ');
   const title=el('h2',{class:'intro-title'},words.flatMap((w,wi)=>[el('span',{class:'w'},[...w].map(ch=>el('span',{class:'l',style:`--i:${idx++}`},ch))),wi<words.length-1?' ':null]));
   const motif=el('div',{class:'motif','aria-hidden':'true'});
@@ -135,6 +142,67 @@ function nextRandom(){
   if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>id!==S.gid));
   startGame(S.bag.pop());
   try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}
+}
+
+/* ---------- home: a card for every game ---------- */
+const FILTERS=[['all','All games'],['new','New'],['Partizan',KIND.Partizan],['Impartial',KIND.Impartial],['Scoring',KIND.Scoring]];
+let filter='all',previewObs=null;
+function view(v){
+  const home=v==='home';
+  $('home').hidden=!home;$('table').hidden=home;$('crumb').hidden=home;
+  document.body.dataset.view=v;
+}
+function setRoute(id){
+  const h=id?'#/play/'+id:'#/';
+  if(location.hash!==h){try{history.pushState(null,'',h)}catch(e){location.hash=h}}
+}
+function goHome(){
+  closeSheet();Demo.stop();Music.stop();
+  const intro=$('intro');intro.hidden=true;intro.classList.remove('playing');
+  view('home');setRoute(null);updateNowPlaying();
+  try{window.scrollTo({top:0})}catch(e){}
+  requestAnimationFrame(()=>document.querySelectorAll('.gprev.drawn').forEach(fitPreview));
+}
+function route(){
+  const m=location.hash.match(/^#\/play\/([a-z0-9]+)/),id=m&&GAMES.some(g=>g.id===m[1])?m[1]:null;
+  if(!id){if(document.body.dataset.view!=='home')goHome();return}
+  if(id===S.gid&&S.state){view('play');return}
+  startGame(id);
+}
+/* draw a game's real starting position, small and still, to fill its card */
+function fitPreview(box){
+  const c=box.firstElementChild;if(!c)return;
+  box.style.setProperty('--fit','1');
+  const w=Math.max(c.scrollWidth,c.offsetWidth),h=Math.max(c.scrollHeight,c.offsetHeight);
+  const z=Math.min(1,(box.clientWidth-16)/w,(box.clientHeight-16)/h);
+  box.style.setProperty('--fit',Math.max(.15,z).toFixed(3));
+}
+function drawPreview(box){
+  const g=GAMES.find(x=>x.id===box.dataset.game);if(!g||box.classList.contains('drawn'))return;
+  box.classList.add('drawn');
+  try{const st=g.create();st.turn=0;const n=g.render(st,{live:false,ui:{},play(){},redraw(){},say(){},busy(){}});
+    box.replaceChildren(n);Skins.decorate(g.id,box);fitPreview(box)}catch(e){console.error(e)}
+}
+function buildHome(){
+  const f=$('filters');
+  f.replaceChildren(...FILTERS.map(([k,label])=>{
+    const b=el('button',{class:'fchip',type:'button','aria-pressed':String(k===filter)},label);
+    b.addEventListener('click',()=>{filter=k;buildHome()});return b;
+  }));
+  const list=GAMES.filter(g=>filter==='all'||(filter==='new'?g.isNew:g.kind===filter))
+    .sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
+  if(previewObs) previewObs.disconnect();
+  previewObs=typeof IntersectionObserver==='function'?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){previewObs.unobserve(e.target);drawPreview(e.target)}}),{rootMargin:'200px'}):null;
+  $('cards').replaceChildren(...list.map(g=>{
+    const prev=el('div',{class:'gprev','data-game':g.id,'aria-hidden':'true'});
+    const card=el('button',{class:'gcard'+(g.isNew?' is-new':''),type:'button','aria-label':`Play ${g.name}`},
+      prev,el('div',{class:'gbody'},
+        el('div',{class:'gmeta'},el('span',{class:'chip'},KIND[g.kind]||g.kind),g.isNew?el('span',{class:'chip new'},'New'):null),
+        el('h3',{},g.name),el('p',{},g.blurb)));
+    card.addEventListener('click',()=>{Sound.unlock();startGame(g.id)});
+    if(previewObs) previewObs.observe(prev); else setTimeout(()=>drawPreview(prev),0);
+    return card;
+  }));
 }
 
 /* ---------- phones and touchscreens ---------- */
@@ -190,11 +258,13 @@ function boot(){
   [['nameL',0],['nameR',1]].forEach(([id,p])=>{const i=$(id);i.value=S.names[p];i.addEventListener('input',()=>{S.names[p]=i.value;Online.setName(p);renderInfo();if(!S.busy)renderPlay()})});
   const sel=$('gameSel');
   GAMES.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>sel.append(el('option',{value:g.id},g.name)));
-  sel.addEventListener('change',()=>{S.bag=S.bag.filter(x=>x!==sel.value);startGame(sel.value)});
+  sel.addEventListener('change',()=>startGame(sel.value));
   [0,1].forEach(p=>$('f'+p).addEventListener('click',()=>{if(S.hist.length||S.busy)return;S.starter=p;S.state.turn=p;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first')}));
-  $('undo').addEventListener('click',()=>{if(!S.hist.length||S.busy||!Online.mayUndo())return;S.state=S.hist.pop();S.who.pop();S.ui={};Sound.fx('undo');renderPlay(true);Online.push('undo')});
+  $('undo').addEventListener('click',()=>{if(!S.hist.length||S.busy||!Online.mayUndo()||S.game.noUndo)return;S.state=S.hist.pop();S.who.pop();S.ui={};Sound.fx('undo');renderPlay(true);Online.push('undo')});
   $('restart').addEventListener('click',()=>{if(!S.busy)newPosition(true)});
-  $('next').addEventListener('click',nextRandom);
+  $('next').addEventListener('click',goHome);
+  $('homeBtn').addEventListener('click',goHome);
+  $('surprise').addEventListener('click',()=>{Sound.unlock();nextRandom()});
   $('musicBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('music',!Sound.pref.music);if(Sound.pref.music&&$('intro').hidden)Music.play(S.gid);else if(!Sound.pref.music)Music.stop();updateNowPlaying()}));
   $('sfxBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('sfx',!Sound.pref.sfx);Sound.fx('pick');updateNowPlaying()}));
   $('lookBtn').addEventListener('click',()=>{Skins.set(!Skins.on);Sound.fx('pick');updateNowPlaying();if(!S.busy)renderPlay()});
@@ -206,9 +276,11 @@ function boot(){
   swipeToClose($('sheetHead'),$('rules'));
   document.addEventListener('pointerdown',e=>{ptr=e.pointerType},true);
   document.addEventListener('click',tapToConfirm,true);
-  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{fitBox($('board'));fitBox($('demoBox'));if(!narrow())closeSheet()},120)});
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{fitBox($('board'));fitBox($('demoBox'));document.querySelectorAll('.gprev.drawn').forEach(fitPreview);if(!narrow())closeSheet()},120)});
   updateNowPlaying();
-  nextRandom();
+  buildHome();
+  addEventListener('hashchange',route);addEventListener('popstate',route);
+  route();
   Online.init();
 }
 if(typeof document!=='undefined') boot();

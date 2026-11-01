@@ -158,7 +158,7 @@ const Online=(()=>{
   function note(m){err=m;if(!$('onlineDlg').open) open();else panel()}
 
   async function shareLink(btn){
-    const url=link(),text=`${name(st.me)!==SIDE[st.me]?name(st.me)+' challenges':'I challenge'} you to ${S.game.name} on PlayTheory`;
+    const url=link(),text=`${name(st.me)!==SIDE[st.me]?name(st.me)+' challenges':'I challenge'} you to ${S.game?S.game.name:'a game'} on PlayTheory`;
     try{
       if(navigator.share&&touchUI()){await navigator.share({title:'PlayTheory challenge',text,url});return}
       await navigator.clipboard.writeText(url);btn.textContent='Link copied ✓';setTimeout(()=>{btn.textContent='Copy link'},1800);
@@ -175,8 +175,7 @@ const Online=(()=>{
       const go=el('button',{class:'btn primary big',type:'button',autofocus:''},'Challenge a friend');
       go.addEventListener('click',()=>run('Creating your challenge…',challenge));
       kids.push(el('h2',{},'Play on two devices'),
-        el('p',{},`Get a link to send to a friend. When they open it, you play ${S.game.name} together: you on blue on this device, them on black on theirs.`),
-        go,el('p',{class:'fine'},'Anyone who opens the link first becomes your opponent, so send it only to them.'));
+        ...(S.game&&!$('table').hidden?[el('p',{},`Get a link to send to a friend. When they open it, you play ${S.game.name} together: you on blue on this device, them on black on theirs.`),go]:[el('p',{},'First pick the game you want to play. Then tap Play online again to get a link for your friend.')]),el('p',{class:'fine'},'Anyone who opens the link first becomes your opponent, so send it only to them.'));
     }else{
       const inp=el('input',{id:'vsLink',class:'vs-link',readonly:'',value:link(),'aria-label':'Challenge link'});
       inp.addEventListener('focus',()=>inp.select());

@@ -369,6 +369,83 @@ button.card15:not(:disabled):hover{transform:translateY(-3px)}
 .d-in{animation:din .5s cubic-bezier(.2,.9,.3,1.3) backwards;transform-box:fill-box;transform-origin:center}
 @keyframes din{from{opacity:0;transform:scale(.5)}}
 
+/* ================= home: pick a game ================= */
+.home{display:flex;flex-direction:column;gap:16px}
+.home-hero{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;padding:22px 24px;border-radius:16px;color:#fff;
+  background:radial-gradient(120% 140% at 0% 0%,color-mix(in srgb,var(--brand-blue) 85%,#fff) 0%,var(--brand-blue) 45%,color-mix(in srgb,var(--brand-blue) 55%,var(--charcoal)) 100%)}
+.home-hero h2{font-family:var(--f-display);font-weight:900;font-size:clamp(30px,5vw,44px);letter-spacing:-.02em;line-height:1;margin:0 0 8px}
+.home-hero p{margin:0;max-width:56ch;opacity:.92}
+.surprise{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--charcoal);border:0;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.surprise svg{width:20px;height:20px}
+.surprise:hover{transform:translateY(-1px)}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.fchip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:600;font-size:14px;cursor:pointer}
+.fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.gcard{display:flex;flex-direction:column;text-align:left;padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden;cursor:pointer;color:inherit;font:inherit;
+  transition:transform .15s ease,box-shadow .15s ease,border-color .15s}
+.gcard:hover,.gcard:focus-visible{transform:translateY(-3px);box-shadow:0 12px 28px rgba(36,36,36,.14);border-color:var(--brand-blue)}
+.gcard.is-new{border:2px solid var(--brand-blue)}
+.gprev{height:150px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden;pointer-events:none;position:relative;--cell:22px}
+.gprev > *{zoom:var(--fit,1);max-width:none}
+.gprev .svgb{width:300px;max-width:none}
+.gbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px}
+.gmeta{display:flex;gap:6px;flex-wrap:wrap}
+.gmeta .chip{font-size:10px;padding:2px 7px}
+.chip.new{background:var(--brand-blue);border-color:var(--brand-blue);color:#fff}
+.gcard h3{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:-.01em;margin:0;line-height:1.15}
+.gcard p{margin:0;color:var(--muted);font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.crumb{display:flex;align-items:center;gap:8px;margin-bottom:-6px}
+.back{font-weight:700}
+
+/* ================= Duo Sudoku ================= */
+.sdk{--sk:clamp(32px,9.4vw,48px);display:flex;flex-direction:column;align-items:center;gap:12px}
+.sdk-setup{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);width:100%;max-width:calc(var(--sk)*9 + 18px)}
+.sdk-opt{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sdk-opt .role{min-width:58px}
+.sdk-opt .seg[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.soon{font:500 10px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;background:var(--surface-2);border-radius:999px;padding:1px 6px;margin-left:2px}
+.sdk-scores{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:calc(var(--sk)*9 + 18px)}
+.sdk-score{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:var(--surface);border:2px solid var(--line);min-width:0;transition:border-color .2s,box-shadow .2s}
+.sdk-score .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.sdk-score.s0 .dot{background:var(--left)} .sdk-score.s1 .dot{background:var(--right)}
+.sdk-score .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.sdk-score b{font:800 22px var(--f-display)}
+.sdk-score.on.s0{border-color:var(--left);box-shadow:0 0 0 3px var(--left-soft)}
+.sdk-score.on.s1{border-color:var(--right);box-shadow:0 0 0 3px var(--right-soft)}
+.sdk-score.out{opacity:.6}
+.sdk-clock{font:500 13px var(--f-mono);color:var(--muted);padding:2px 6px;border-radius:6px;background:var(--surface-2)}
+.sdk-clock.low{color:#fff;background:#c0392b;animation:livepulse 1s ease-in-out infinite}
+.sdk-grid{display:grid;grid-template-columns:repeat(3,auto);gap:3px;border:3px solid var(--ink);border-radius:8px;overflow:hidden;background:var(--ink)}
+.sdk-box{display:grid;grid-template-columns:repeat(3,var(--sk));gap:1px;background:color-mix(in srgb,var(--ink) 35%,transparent)}
+.sc{width:var(--sk);height:var(--sk);border:0;padding:0;margin:0;background:var(--surface);position:relative;display:grid;place-items:center;font:700 calc(var(--sk)*.52) var(--f-display);color:var(--ink);cursor:pointer}
+div.sc{cursor:default}
+.sc.g{background:var(--surface-2);font-weight:800}
+.sc.o0{color:var(--left)} .sc.o1{color:var(--right)}
+.sc.o0 .dg,.sc.o1 .dg{font-family:var(--f-display);font-weight:900}
+.sc.b2{background:#fff6d6} .sc.b3{background:#ffe3c2}
+.sc.peer{background:#edf3fa} .sc.g.peer{background:#e3ebf5}
+.sc.same{background:#d6e6f6}
+.sc.sel{background:#bfd6ef;outline:3px solid var(--brand-blue);outline-offset:-3px;z-index:1}
+.sc.last .dg{animation:stamp .3s ease-out}
+.sc.bad{background:#fbd5d0!important}
+.bb-tag{position:absolute;top:2px;right:3px;font:800 calc(var(--sk)*.26) var(--f-display);color:#9a6a00;line-height:1}
+.sc.b3 .bb-tag{color:#b5530b}
+.tr{position:absolute;left:3px;bottom:2px;display:flex;flex-wrap:wrap;gap:1px;max-width:70%;font:600 calc(var(--sk)*.22) var(--f-mono);color:#c0392b;line-height:1}
+.tr s{text-decoration-thickness:1.5px}
+.sdk-float{position:absolute;left:50%;top:10%;transform:translate(-50%,0);font:900 calc(var(--sk)*.4) var(--f-display);pointer-events:none;animation:floatup .9s ease-out forwards;z-index:3;text-shadow:0 1px 0 #fff}
+.sdk-float.f0{color:var(--left)} .sdk-float.f1{color:var(--right)} .sdk-float.bad{color:#c0392b}
+@keyframes floatup{from{opacity:1;transform:translate(-50%,0) scale(.8)}to{opacity:0;transform:translate(-50%,-140%) scale(1.25)}}
+.sdk-pad{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px;width:100%;max-width:calc(var(--sk)*9 + 18px)}
+.sdk-pad .key{aspect-ratio:1/1.15;border-radius:9px;border:1px solid var(--line);background:var(--surface);font:800 20px var(--f-display);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0;box-shadow:0 2px 0 var(--line)}
+.sdk-pad .key small{font:500 10px var(--f-mono);color:var(--muted)}
+.sdk-pad .key:not(:disabled):hover{background:var(--left-soft);border-color:var(--left)}
+.sdk-pad .key:disabled{opacity:.35;cursor:default}
+.themed .board[data-game="duosudoku"] > *{rotate:none}
+.demo-box .sdk-pad,.demo-box .sdk-setup,.gprev .sdk-pad,.gprev .sdk-setup,.gprev .sdk-scores{display:none}
+.demo-box .sdk{--sk:22px}
+.demo-box .sdk-score{padding:4px 8px}.demo-box .sdk-score b{font-size:15px}
+
 /* ================= online: play a friend on another device ================= */
 .net-tog[aria-pressed="false"]{color:var(--ink);border-color:var(--line)}
 .net-tog[aria-pressed="true"]{background:var(--brand-blue);color:#fff;border-color:var(--brand-blue)}
@@ -442,6 +519,16 @@ button.card15:not(:disabled):hover{transform:translateY(-3px)}
 }
 
 @media (max-width:600px){
+  .sdk{--sk:min(44px,calc((100vw - 98px)/9))}
+  .sdk-pad .key{font-size:18px;border-radius:7px}
+  .home-hero{padding:18px;border-radius:14px}
+  .surprise{width:100%;justify-content:center}
+  .cards{grid-template-columns:1fr 1fr;gap:10px}
+  .gprev{height:110px}
+  .gbody{padding:9px 10px 11px;gap:4px}
+  .gcard h3{font-size:16px}
+  .gcard p{font-size:12.5px}
+  .gmeta .chip:not(.new){display:none}
   body{padding-block:12px 26px}
   .app{gap:14px}
   .top{gap:10px}

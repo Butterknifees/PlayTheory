@@ -643,3 +643,167 @@ def({id:'to15',name:'3-to-15',kind:'Impartial',sfx:'card',motif:'card',
     const hand=p=>el('div',{class:'hand h'+p},el('span',{class:'role'},name(p)),el('div',{class:'cards'},s.own.map((o,i)=>o===p?el('span',{},String(i+1)):null)));
     return el('div',{class:'c15'},deck,el('div',{class:'hands'},hand(0),hand(1)));
   }});
+
+/* ---------------- Duo Sudoku ---------------- */
+/* puzzles are made here: fill a random solved grid, then remove numbers one at a time,
+   keeping a number only when removing it would allow a second solution */
+const SDK={
+  peers:Array.from({length:81},(_,i)=>{const r=i/9|0,c=i%9,b=(r/3|0)*27+(c/3|0)*3,s=new Set();
+    for(let k=0;k<9;k++){s.add(r*9+k);s.add(k*9+c);s.add(b+(k/3|0)*9+k%3)}s.delete(i);return[...s]}),
+  ok:(g,i,d)=>SDK.peers[i].every(j=>g[j]!==d),
+  fill(g){const i=g.indexOf(0);if(i<0)return true;
+    for(const d of shuffle([1,2,3,4,5,6,7,8,9]))if(SDK.ok(g,i,d)){g[i]=d;if(SDK.fill(g))return true}
+    g[i]=0;return false},
+  count(g,lim){ // number of solutions, up to lim; tries the most constrained square first
+    let best=-1,cand=null;
+    for(let i=0;i<81;i++)if(!g[i]){const c=[];for(let d=1;d<=9;d++)if(SDK.ok(g,i,d))c.push(d);
+      if(!c.length)return 0;if(!cand||c.length<cand.length){best=i;cand=c;if(c.length===1)break}}
+    if(best<0)return 1;
+    let n=0;for(const d of cand){g[best]=d;n+=SDK.count(g,lim-n);if(n>=lim)break}
+    g[best]=0;return n;
+  },
+  make(givens){
+    const sol=Array(81).fill(0);SDK.fill(sol);
+    const grid=sol.slice();let left=81;
+    for(const i of shuffle([...Array(81).keys()])){
+      if(left<=givens)break;
+      const d=grid[i];grid[i]=0;
+      if(SDK.count(grid.slice(),2)===1)left--;else grid[i]=d;
+    }
+    return{grid,sol};
+  }
+};
+const sdkMoves=s=>s.own.filter(o=>o>=0).length+s.tried.join('').length+s.out[0]+s.out[1];
+function sdkPlace(s,i,d,spent){
+  const p=s.turn,n=clone(s),ok=s.sol[i]===d,pts=ok?d*s.boost[i]:-1;
+  if(n.limit&&spent) n.clock[p]=Math.max(0,n.clock[p]-spent);
+  if(ok){n.grid[i]=d;n.own[i]=p}else n.tried[i]+=d;
+  n.score[p]+=pts;n.last={i,d,ok,p,pts};
+  n.turn=n.out[1-p]?p:1-p;
+  return n;
+}
+function sdkTimeout(s){const p=s.turn,n=clone(s);n.clock[p]=0;n.out[p]=1;n.last={timeout:p};n.turn=1-p;return n}
+const sdkFmt=ms=>{const t=Math.max(0,Math.ceil(ms/1000));return`${t/60|0}:${String(t%60).padStart(2,'0')}`};
+/* the running clock lives outside the state: it restarts whenever the turn changes */
+const sdkClock={key:'',t:0,timeout:null};
+const sdkSpent=s=>s.limit&&sdkMoves(s)>0&&sdkClock.key?Date.now()-sdkClock.t:0;
+
+def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
+  blurb:'One sudoku, two players, bonus squares. Every number you get right scores; every miss costs you.',
+  rules:['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.','Players take turns placing one number in any empty square.','A correct number scores its value. On a ×2 or ×3 square it scores double or triple.','A wrong number scores −1 and is crossed out in that square, so nobody can try it there again.','With a timer, each player has their own clock that runs only on their turn. If yours runs out, you stop and your opponent plays on alone.'],
+  win:'When the board is full, or both clocks have run out, the higher score wins. A tie is possible.',
+  how:'Click an empty square, then a number.',
+  create:()=>{
+    const {grid,sol}=SDK.make(R(32,36)),boost=Array(81).fill(1);
+    const empty=shuffle(grid.map((d,i)=>d?-1:i).filter(i=>i>=0));
+    empty.slice(0,4).forEach(i=>boost[i]=3);empty.slice(4,12).forEach(i=>boost[i]=2);
+    return{grid,sol,given:grid.map(d=>d?1:0),boost,own:Array(81).fill(-1),tried:Array(81).fill(''),score:[0,0],out:[0,0],limit:0,clock:[0,0],last:null};
+  },
+  moves:s=>s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].filter(d=>!s.tried[i].includes(d)).map(d=>sdkPlace(s,i,d,0))),
+  hasMove:(s,p)=>!s.out[p]&&s.grid.includes(0),
+  demoMove:s=>{
+    const empty=s.grid.map((v,i)=>v?-1:i).filter(i=>i>=0);
+    const i=Math.random()<.35?(empty.find(i=>s.boost[i]>1)??pick(empty)):pick(empty);
+    const wrong=[1,2,3,4,5,6,7,8,9].filter(d=>d!==s.sol[i]&&!s.tried[i].includes(d));
+    return sdkPlace(s,i,Math.random()<.72||!wrong.length?s.sol[i]:pick(wrong),0);
+  },
+  result:s=>{
+    if(s.grid.includes(0)&&!(s.out[0]&&s.out[1])) return null;
+    const [a,b]=s.score,tally=`Points: ${name(0)} ${a}, ${name(1)} ${b}.`;
+    return a===b?{winner:'draw',reason:tally}:{winner:a>b?0:1,reason:tally};
+  },
+  render(s,ctx){
+    const p=s.turn,app=typeof ctx.configure==='function',started=sdkMoves(s)>0,sel=ctx.ui.sel;
+    if(app){
+      const key=sdkMoves(s)+':'+p;
+      if(key!==sdkClock.key){sdkClock.key=key;sdkClock.t=Date.now()}
+      sdkClock.timeout=()=>ctx.play(sdkTimeout(s),async()=>{Sound.fx('bell')},{silent:true});
+    }
+    const wrap=el('div',{class:'sdk'});
+
+    /* before the first move: choose the timer (and see what scoring is coming) */
+    if(app&&!started){
+      const opt=(label,ms)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(s.limit===ms)},label);
+        b.disabled=!ctx.live;b.addEventListener('click',()=>ctx.configure({...clone(s),limit:ms,clock:[ms,ms]}));return b};
+      wrap.append(el('div',{class:'sdk-setup'},
+        el('div',{class:'sdk-opt'},el('span',{class:'role'},'Timer'),opt('Off',0),opt('3 min each',180000),opt('5 min each',300000)),
+        el('div',{class:'sdk-opt'},el('span',{class:'role'},'Scoring'),el('button',{class:'seg',type:'button','aria-pressed':'true'},'Number × booster'),
+          el('button',{class:'seg',type:'button',disabled:'',title:'Points based on how hard each square was to work out'},'By difficulty ',el('span',{class:'soon'},'Coming soon')))));
+    }
+
+    /* scores and clocks */
+    const pill=q=>el('div',{class:'sdk-score s'+q+(p===q&&!s.out[q]?' on':'')+(s.out[q]?' out':'')},
+      el('span',{class:'dot'}),el('span',{class:'nm'},name(q)),el('b',{},String(s.score[q])),
+      s.limit?el('span',{class:'sdk-clock','data-p':q},s.out[q]?'Time’s up':sdkFmt(s.clock[q]-(app&&started&&q===p?Date.now()-sdkClock.t:0))):null);
+    wrap.append(el('div',{class:'sdk-scores'},pill(0),pill(1)));
+
+    /* the grid */
+    const grid=el('div',{class:'sdk-grid'}),cells=[],boxes=Array.from({length:9},()=>el('div',{class:'sdk-box'}));
+    grid.append(...boxes);
+    const selD=sel!=null?s.grid[sel]:0,peers=sel!=null?new Set(SDK.peers[sel]):null;
+    for(let i=0;i<81;i++){
+      const v=s.grid[i],open=!v&&ctx.live;
+      const cls='sc'+(s.given[i]?' g':'')+(s.own[i]>=0?' o'+s.own[i]:'')+(s.boost[i]>1&&!s.given[i]?' b'+s.boost[i]:'')+
+        (i===sel?' sel':'')+(peers&&peers.has(i)?' peer':'')+(selD&&v===selD&&i!==sel?' same':'')+(s.last&&s.last.i===i?' last':'');
+      const c=el(open||v?'button':'div',{class:cls,type:'button','data-i':i,'aria-label':`Row ${(i/9|0)+1}, column ${i%9+1}${v?', '+v:', empty'}${s.boost[i]>1&&!v?', times '+s.boost[i]:''}`});
+      if(!open&&!v) c.tabIndex=-1;
+      if(v) c.append(el('span',{class:'dg'},String(v)));
+      else{
+        if(s.boost[i]>1) c.append(el('span',{class:'bb-tag'},'×'+s.boost[i]));
+        if(s.tried[i]) c.append(el('span',{class:'tr'},...[...s.tried[i]].map(d=>el('s',{},d))));
+      }
+      if(open||v) c.addEventListener('click',()=>{ctx.ui.sel=i;ctx.redraw()});
+      cells.push(c);boxes[((i/9|0)/3|0)*3+((i%9)/3|0)].append(c);
+    }
+    wrap.append(grid);
+
+    /* the number pad */
+    const pad=el('div',{class:'sdk-pad'});
+    const done=d=>s.grid.filter(x=>x===d).length===9;
+    for(let d=1;d<=9;d++){
+      const b=el('button',{class:'key',type:'button','data-d':d,'aria-label':'Place '+d},String(d),el('small',{},done(d)?'✓':String(9-s.grid.filter(x=>x===d).length)));
+      b.disabled=!ctx.live||sel==null||!!s.grid[sel]||s.tried[sel].includes(d)||done(d);
+      b.addEventListener('click',()=>{
+        const i=sel,cell=cells[i],n=sdkPlace(s,i,d,sdkSpent(s)),hit=n.last.ok;
+        ctx.play(n,async()=>{
+          const fl=el('span',{class:'sdk-float'+(hit?' f'+p:' bad')},hit?'+'+n.last.pts:'−1');cell.append(fl);
+          if(hit){cell.classList.add('o'+p);cell.replaceChildren(el('span',{class:'dg'},String(d)),fl);
+            Sound.fx(s.boost[i]>1?'coin':'pop',{p});FX.burstAt(cell,[FX.color(PC[p]),'#ffd27a','#ffffff'],s.boost[i]>1?34:16,{speed:s.boost[i]>1?190:120})}
+          else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p})}
+          await sleep(hit?380:520);
+        },{silent:true});
+      });
+      pad.append(b);
+    }
+    wrap.append(pad);
+
+    if(sel==null) ctx.say(`Click an empty square, then a number. A right number scores its value${s.limit?'':''}, times any booster. A wrong one costs 1 point.`);
+    else if(!s.grid[sel]) ctx.say(`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
+    if(s.out[p]===0&&s.out[1-p]) ctx.say(`${name(1-p)} is out of time. ${name(p)} plays on alone.`);
+    return wrap;
+  }});
+
+/* keyboard: 1 to 9 places a number, arrow keys move around the grid; the clocks tick here too */
+if(typeof document!=='undefined'){
+  document.addEventListener('keydown',e=>{
+    if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||S.busy) return;
+    if(e.target.closest&&e.target.closest('input,select,textarea,dialog')) return;
+    const b=document.getElementById('board');if(!b||!b.offsetParent) return;
+    if(/^[1-9]$/.test(e.key)){const k=b.querySelector(`.sdk-pad button[data-d="${e.key}"]`);if(k&&!k.disabled){e.preventDefault();k.click()}return}
+    const mv={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];
+    if(mv==null) return;
+    const i=S.ui.sel??40,j=i+mv;
+    if(j<0||j>80||(Math.abs(mv)===1&&(i/9|0)!==(j/9|0))) return;
+    e.preventDefault();S.ui.sel=j;renderPlay();
+    const c=b.querySelector(`.sdk-grid .sc[data-i="${j}"]`);if(c)c.focus({preventScroll:true});
+  });
+  setInterval(()=>{
+    if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||!S.state.limit||S.over||S.busy) return;
+    const s=S.state,p=s.turn;if(!sdkMoves(s)||s.out[p]) return;
+    const left=s.clock[p]-(Date.now()-sdkClock.t);
+    document.querySelectorAll(`#board .sdk-clock[data-p="${p}"]`).forEach(e=>{e.textContent=sdkFmt(left);e.classList.toggle('low',left<30000)});
+    if(left>0||!sdkClock.timeout) return;
+    const mine=typeof Online==='undefined'||!Online.on||Online.me===p;
+    if(mine||left<-4000){const t=sdkClock.timeout;sdkClock.timeout=null;t()}
+  },250);
+}

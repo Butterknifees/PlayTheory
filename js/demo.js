@@ -14,6 +14,7 @@ const Demo=(()=>{
 
   /* a light-touch player: win if it can, keep extra turns, otherwise leave the opponent few replies */
   function choose(s){
+    if(game.demoMove) return game.demoMove(s);
     let ms=game.moves(s);
     if(ms.length>40) ms=shuffle(ms.slice()).slice(0,40);
     let best=null,bestScore=Infinity;
