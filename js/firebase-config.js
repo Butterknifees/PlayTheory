@@ -1,5 +1,10 @@
 "use strict";
-/* Online play (Challenge a friend) needs a Firebase project. Paste your web app's config here,
-   e.g. {apiKey:"...",authDomain:"...",databaseURL:"https://...firebaseio.com",projectId:"...",appId:"..."}.
-   See ONLINE.md for the steps. Leave it null and PlayTheory stays a one-screen game. */
-const FIREBASE_CONFIG=null;
+/* Firebase project for online play (Challenge a friend). See ONLINE.md.
+   These values are public by design; the database rules (database.rules.json) keep matches private. */
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyDsE1AL6pJYpl0AB1XlB2SB95SWfqw6AZ0",
+  authDomain:"play-theory.firebaseapp.com",
+  databaseURL:"https://play-theory-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"play-theory",
+  appId:"1:240543726043:web:821f222abc546b16f68ffe"
+};
