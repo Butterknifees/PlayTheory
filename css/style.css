@@ -443,6 +443,12 @@ div.sc{cursor:default}
 .sdk-float{position:absolute;left:50%;top:10%;transform:translate(-50%,0);font:900 calc(var(--sk)*.4) var(--f-display);pointer-events:none;animation:floatup .9s ease-out forwards;z-index:3;text-shadow:0 1px 0 #fff}
 .sdk-float.f0{color:var(--left)} .sdk-float.f1{color:var(--right)} .sdk-float.bad{color:#c0392b}
 @keyframes floatup{from{opacity:1;transform:translate(-50%,0) scale(.8)}to{opacity:0;transform:translate(-50%,-140%) scale(1.25)}}
+.sdk-worth{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;padding:5px;border-radius:10px;background:var(--surface);border:1px solid var(--line);width:100%;max-width:calc(var(--sk)*9 + 18px)}
+.sdk-worth .wv{display:flex;flex-direction:column;align-items:center;line-height:1.1;padding:3px 0;border-radius:6px;background:var(--surface-2)}
+.sdk-worth b{font:800 15px var(--f-display)}
+.sdk-worth span{font:800 13px var(--f-mono);color:var(--brand-blue)}
+.sdk-worth .done{opacity:.35}
+.demo-box .sdk-worth,.gprev .sdk-worth{display:none}
 .sdk-pad{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px;width:100%;max-width:calc(var(--sk)*9 + 18px)}
 .sdk-pad .key{aspect-ratio:1/1.15;border-radius:9px;border:1px solid var(--line);background:var(--surface);font:800 20px var(--f-display);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0;box-shadow:0 2px 0 var(--line)}
 .sdk-pad .key small{font:500 10px var(--f-mono);color:var(--muted)}

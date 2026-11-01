@@ -683,8 +683,16 @@ function sdkBoard(diff){
 /* two ways to play: take turns (30 s a turn, optional clock each), or rapid fire (everyone at once, one game clock) */
 const sdkNow=()=>Date.now()+(typeof Online!=='undefined'?Online.offset:0);
 const sdkCount=s=>s.n+s.out[0]+s.out[1]+(s.skips||0);
+/* by-difficulty scoring: the more copies of a number still to place, the more it is worth.
+   Numbers are ranked by how many are left, ties share a rank, and rank 1 is worth 1 point. */
+function sdkWorth(grid){
+  const left=[0];for(let d=1;d<=9;d++)left.push(9-grid.filter(x=>x===d).length);
+  const ranks=[...new Set(left.slice(1).filter(x=>x>0))].sort((a,b)=>a-b);
+  return left.map((x,d)=>d&&x?ranks.indexOf(x)+1:0);
+}
+const sdkValue=(s,d)=>s.scoring==='diff'?sdkWorth(s.grid)[d]:d;
 function sdkPlace(s,i,d,spent,p=s.turn){
-  const n=clone(s),ok=s.sol[i]===d,pts=ok?d*s.boost[i]:-1;
+  const n=clone(s),ok=s.sol[i]===d,pts=ok?sdkValue(s,d)*s.boost[i]:-1;
   if(ok){n.grid[i]=d;n.own[i]=p}
   n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n};
   if(s.mode==='rapid'){if(!n.deadline&&n.limit)n.deadline=sdkNow()+n.limit;return n}
@@ -711,13 +719,15 @@ function sdkEffect(l){
 def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
   blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
-    'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty.',
-    'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the 3 or 5 minute game clock ends.',
+    s&&s.scoring==='diff'
+      ?'Scoring by difficulty: numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty.'
+      :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
+    'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the game clock ends (3, 5 or 10 minutes; 10 is the default).',
     'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.'],
   win:'When the board is full or time is up, the higher score wins. A tie is possible.',
   how:'Click an empty square, then a number.',
   create:()=>({...sdkBoard('medium'),score:[0,0],n:0,last:null,
-      mode:'rapid',turnLimit:30000,limit:180000,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0}),
+      mode:'rapid',scoring:'number',turnLimit:30000,limit:600000,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0}),
   moves:s=>s.mode==='rapid'||s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].map(d=>sdkPlace(s,i,d,0))),
   hasMove:(s,p)=>s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
   anyTurn:s=>s.mode==='rapid',
@@ -753,12 +763,11 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
       const row=(label,...b)=>el('div',{class:'sdk-opt'},el('span',{class:'role'},label),...b);
       const diff=s.diff||'medium',level=(label,d)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(diff===d)},label);
         b.disabled=!ctx.live;b.addEventListener('click',()=>{if(diff!==d)ctx.configure({...clone(s),...sdkBoard(d)})});return b};
-      const rows=[row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:180000,clock:[0,0]}),pick2('Take turns',!rapid,{mode:'turns',limit:0,clock:[0,0]}))];
-      if(rapid) rows.push(row('Game time',pick2('3 min',s.limit===180000,{limit:180000}),pick2('5 min',s.limit===300000,{limit:300000})));
+      const rows=[row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:600000,clock:[0,0]}),pick2('Take turns',!rapid,{mode:'turns',limit:0,clock:[0,0]}))];
+      if(rapid) rows.push(row('Game time',pick2('3 min',s.limit===180000,{limit:180000}),pick2('5 min',s.limit===300000,{limit:300000}),pick2('10 min',s.limit===600000,{limit:600000})));
       else rows.push(row('Per turn',pick2('30 s',!!s.turnLimit,{turnLimit:30000}),pick2('No limit',!s.turnLimit,{turnLimit:0})),
         row('Clock',pick2('Off',!s.limit,{limit:0,clock:[0,0]}),pick2('3 min each',s.limit===180000,{limit:180000,clock:[180000,180000]}),pick2('5 min each',s.limit===300000,{limit:300000,clock:[300000,300000]})));
-      rows.push(row('Scoring',el('button',{class:'seg',type:'button','aria-pressed':'true'},'Number × booster'),
-        el('button',{class:'seg',type:'button',disabled:'',title:'Points based on how hard each square was to work out'},'By difficulty ',el('span',{class:'soon'},'Coming soon'))));
+      rows.push(row('Scoring',pick2('Number value',s.scoring!=='diff',{scoring:'number'}),pick2('By difficulty',s.scoring==='diff',{scoring:'diff'})));
       wrap.append(el('div',{class:'sdk-setup'},...rows));
     }
 
@@ -769,6 +778,13 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
     wrap.append(el('div',{class:'sdk-scores'},pill(0),pill(1)));
     if(rapid) wrap.append(el('div',{class:'sdk-gclock'+(s.deadline?'':' idle')},s.deadline?sdkFmt(s.deadline-sdkNow()):`${sdkFmt(s.limit)} · starts with the first number`));
     else if(s.turnLimit&&started) wrap.append(el('div',{class:'sdk-turnbar t'+p},el('div',{class:'trk'},el('i',{style:`--w:${Math.max(0,100-(Date.now()-sdkClock.t)/s.turnLimit*100)}%`})),el('span',{},Math.max(0,Math.ceil((s.turnLimit-(Date.now()-sdkClock.t))/1000))+'s')));
+
+    /* by difficulty: what each number is worth right now */
+    if(s.scoring==='diff'){
+      const w=sdkWorth(s.grid);
+      wrap.append(el('div',{class:'sdk-worth','aria-label':'Points for each number right now'},
+        ...[1,2,3,4,5,6,7,8,9].map(d=>el('div',{class:'wv'+(w[d]?'':' done')},el('b',{},String(d)),el('span',{},w[d]?'+'+w[d]:'✓')))));
+    }
 
     /* the grid */
     const grid=el('div',{class:'sdk-grid'}),boxes=Array.from({length:9},()=>el('div',{class:'sdk-box'}));
@@ -805,8 +821,8 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
     else if(sdkOnline()) wrap.append(el('div',{class:'sdk-pads one'},padFor(Online.me)));
     else wrap.append(el('div',{class:'sdk-pads'},padFor(0),padFor(1)));
 
-    if(rapid&&!s.ended) ctx.say(sel==null?'Both of you play at once. Click an empty square, then a number on your own pad.':`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
-    else if(sel==null) ctx.say(`Click an empty square, then a number. A right number scores its value, times any booster. A wrong one costs 1 point.${s.turnLimit?' You have 30 seconds a turn.':''}`);
+    if(rapid&&!s.ended) ctx.say(sel==null?'Both of you play at once. Click an empty square, then a number on your own pad.'+(s.scoring==='diff'?' The strip above the board shows what each number is worth right now.':''):`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
+    else if(sel==null) ctx.say(`Click an empty square, then a number. A right number scores ${s.scoring==='diff'?'its points in the strip above the board':'its value'}, times any booster. A wrong one costs 1 point.${s.turnLimit?' You have 30 seconds a turn.':''}`);
     else if(!s.grid[sel]) ctx.say(`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
     if(!rapid&&s.last&&s.last.skip!=null&&sel==null) ctx.say(`${name(s.last.skip)} ran out of time for that turn. ${name(p)} is up.`);
     if(!rapid&&s.out[p]===0&&s.out[1-p]) ctx.say(`${name(1-p)} is out of time. ${name(p)} plays on alone.`);

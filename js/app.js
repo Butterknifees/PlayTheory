@@ -34,7 +34,7 @@ const ctx={
   redraw(){renderPlay()},
   configure(next){ // change set-up options (like a timer) before the first move
     if(S.hist.length||S.busy||!Online.mayMove()) return;
-    S.state=next;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first');
+    S.state=next;S.ui={};Sound.fx('pick');renderInfo();renderPlay(true);Online.push('first');
   },
   say(m){S.hint=m}
 };
