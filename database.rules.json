@@ -82,6 +82,15 @@
         ".read": "auth != null && data.child('at').val() > now - 86400000 && !root.child('matches').child(data.child('m').val()).child('guest').exists()",
         ".write": "auth != null && ((newData.child('host').val() === auth.uid && (!data.exists() || data.child('at').val() <= now - 86400000)) || (!newData.exists() && data.child('host').val() === auth.uid))",
         ".validate": "$code.matches(/^[A-Z2-9]{5}$/) && newData.hasChildren(['m', 'host', 'at']) && newData.child('m').isString() && newData.child('m').val().matches(/^[a-z0-9]{12}$/) && root.child('matches').child(newData.child('m').val()).child('host').val() === auth.uid && newData.child('at').val() === now",
+        "m": {
+          ".validate": "newData.isString()"
+        },
+        "host": {
+          ".validate": "newData.isString()"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
         "$other": {
           ".validate": false
         }

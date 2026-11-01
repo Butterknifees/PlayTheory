@@ -719,15 +719,15 @@ function sdkEffect(l){
 def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
   blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
-    s&&s.scoring==='diff'
-      ?'Scoring by difficulty: numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty.'
+    !s||s.scoring==='diff'
+      ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. You can also choose number value scoring, where a correct number scores its own value.'
       :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
     'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the game clock ends (3, 5 or 10 minutes; 10 is the default).',
     'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.'],
   win:'When the board is full or time is up, the higher score wins. A tie is possible.',
   how:'Click an empty square, then a number.',
   create:()=>({...sdkBoard('medium'),score:[0,0],n:0,last:null,
-      set:0,mode:'rapid',scoring:'number',turnLimit:30000,limit:600000,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0}),
+      set:0,mode:'rapid',scoring:'diff',turnLimit:30000,limit:600000,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0}),
   moves:s=>s.mode==='rapid'||s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].map(d=>sdkPlace(s,i,d,0))),
   hasMove:(s,p)=>s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
   anyTurn:s=>s.mode==='rapid',
@@ -768,7 +768,7 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
       if(rapid) rows.push(row('Game time',pick2('3 min',s.limit===180000,{limit:180000}),pick2('5 min',s.limit===300000,{limit:300000}),pick2('10 min',s.limit===600000,{limit:600000})));
       else rows.push(row('Per turn',pick2('30 s',!!s.turnLimit,{turnLimit:30000}),pick2('No limit',!s.turnLimit,{turnLimit:0})),
         row('Clock',pick2('Off',!s.limit,{limit:0,clock:[0,0]}),pick2('3 min each',s.limit===180000,{limit:180000,clock:[180000,180000]}),pick2('5 min each',s.limit===300000,{limit:300000,clock:[300000,300000]})));
-      rows.push(row('Scoring',pick2('Number value',s.scoring!=='diff',{scoring:'number'}),pick2('By difficulty',s.scoring==='diff',{scoring:'diff'})));
+      rows.push(row('Scoring',pick2('By difficulty',s.scoring==='diff',{scoring:'diff'}),pick2('Number value',s.scoring!=='diff',{scoring:'number'})));
       const waitFriend=sdkOnline()&&!Online.friend;
       const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':'Start game');
       go.disabled=!ctx.live||waitFriend;
