@@ -37,7 +37,7 @@ const Online=(()=>{
     mode=asRoom?'room':'link';
     for(let i=0;i<5;i++){
       const m=rand(ID_CHARS,12),data=snap();
-      const res=await db.ref('matches/'+m).transaction(r=>r===null?{v:1,host:uid,created:Date.now(),seq:1,kind:'game',by:0,snap:data,names:{L:S.names[0]||''}}:undefined);
+      const res=await db.ref('matches/'+m).transaction(r=>r===null?{v:1,host:uid,created:Date.now(),seq:1,kind:'game',by:0,snap:data,names:{L:S.me||S.names[0]||''}}:undefined);
       if(res.committed){seq=1;lastTok=null;fresh=false;await roomCode(m);return enter(m,0)}
     }
     throw new Error('Could not start a match. Try again.');
@@ -74,7 +74,7 @@ const Online=(()=>{
     id=m;st.me=seat;st.on=true;ref=db.ref('matches/'+m);
     const me=ref.child('online/'+PC[seat]);
     db.ref('.info/connected').on('value',s=>{if(s.val()===true){me.onDisconnect().set(false);me.set(true)}});
-    if(S.names[seat]) ref.child('names/'+PC[seat]).set(S.names[seat]);
+    if(S.me){S.names[seat]=S.me;S.names[1-seat]='';ref.child('names/'+PC[seat]).set(S.me)}
     ref.on('value',s=>receive(s.val()));
     setURL(m);document.body.classList.add('online');
     names();bar();if(!S.busy) renderPlay();
@@ -85,6 +85,7 @@ const Online=(()=>{
     clearTimeout(replayT);clearTimeout(nameT);
     st.on=false;ref=null;id=null;match=null;seq=0;lastTok=null;
     setURL(null);document.body.classList.remove('online');lock(false);
+    S.names=[S.me,S.opp];
     names();bar();renderPlay();
     if(msg) note(msg);
   }
@@ -171,7 +172,7 @@ const Online=(()=>{
       const inp=$(i),theirs=st.on&&p!==st.me;
       inp.disabled=theirs;
       if(theirs){inp.value=S.names[p];inp.placeholder=friendJoined()?'Friend':'Waiting…'}
-      else{inp.placeholder=p===0?'Your name':'Their name';if(st.on)inp.placeholder='Your name'}
+      else{inp.placeholder=p===0?'Your name':'Their name';if(st.on)inp.placeholder='Your name';if(inp.value!==S.names[p])inp.value=S.names[p]}
     });
   }
   function bar(){

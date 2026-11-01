@@ -74,7 +74,7 @@ function renderPlay(moved){
     const w=over.winner;res.hidden=false;res.className='result'+(w==='draw'?'':' w'+w);
     const again=el('button',{class:'btn',type:'button'},'Play again');again.addEventListener('click',()=>newPosition(true));
     const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Choose another game');nxt.addEventListener('click',goHome);
-    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},over.reason)),el('div',{class:'row'},again,nxt));
+    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},pn(over.reason))),el('div',{class:'row'},again,nxt));
   }else res.hidden=true;
   S.hint=null;
   const board=$('board');
@@ -278,8 +278,42 @@ function swipeToClose(handle,sheet){
   handle.addEventListener('touchend',()=>{sheet.classList.remove('dragging');if(dy>80)closeSheet();else sheet.style.transform='';y0=null});
 }
 
+/* everyone says who they are on arrival; the names last until the page is refreshed */
+function applyNames(){
+  if(Online.on) S.names[Online.me]=S.me; else S.names=[S.me,S.opp];
+  $('nameL').value=S.names[0];$('nameR').value=S.names[1];
+  renderInfo();if(S.state&&!S.busy)renderPlay();
+}
+function askNames(join){
+  return new Promise(done=>{
+    const d=$('nameDlg'),f=$('nameForm');let away=join;
+    const field=ph=>el('input',{class:'name-in',maxlength:'16',autocomplete:'off',placeholder:ph,'aria-label':ph,enterkeyhint:'next'});
+    const me=field('Your name'),opp=field('Your opponent’s name');
+    const oppRow=el('label',{class:'name-row'},el('span',{class:'dot r'}),opp);
+    const go=el('button',{class:'btn primary big',type:'submit'},join?'Join the game':'Let’s play');
+    const sw=el('button',{class:'name-sw',type:'button'});
+    const draw=()=>{oppRow.hidden=away;sw.hidden=join;sw.textContent=away?'We’re sharing this screen':'My opponent is on another device';
+      go.disabled=!me.value.trim()||(!away&&!opp.value.trim())};
+    f.replaceChildren(el('h2',{},join?'You’ve been challenged!':'Who’s playing?'),
+      el('p',{},join?'Tell your friend who you are.':'Add both names. They’re used for the rest of the game until you refresh the page.'),
+      el('label',{class:'name-row'},join?null:el('span',{class:'dot l'}),me),oppRow,sw,go);
+    me.addEventListener('input',draw);opp.addEventListener('input',draw);
+    sw.addEventListener('click',()=>{away=!away;draw();(away?go:opp).focus()});
+    me.addEventListener('keydown',e=>{if(e.key==='Enter'&&!away&&!opp.value.trim()){e.preventDefault();opp.focus()}});
+    d.addEventListener('cancel',e=>e.preventDefault());
+    f.addEventListener('submit',e=>{
+      e.preventDefault();if(go.disabled)return;
+      S.me=me.value.trim();S.opp=away?'':opp.value.trim();
+      try{d.close()}catch(x){d.removeAttribute('open')}
+      applyNames();done();
+    });
+    draw();
+    try{d.showModal()}catch(x){d.setAttribute('open','')}
+    setTimeout(()=>me.focus(),50);
+  });
+}
 function boot(){
-  [['nameL',0],['nameR',1]].forEach(([id,p])=>{const i=$(id);i.value=S.names[p];i.addEventListener('input',()=>{S.names[p]=i.value;Online.setName(p);renderInfo();if(!S.busy)renderPlay()})});
+  [['nameL',0],['nameR',1]].forEach(([id,p])=>{const i=$(id);i.value=S.names[p];i.addEventListener('input',()=>{S.names[p]=i.value;if(Online.on?p===Online.me:p===0)S.me=i.value;else if(!Online.on)S.opp=i.value;Online.setName(p);renderInfo();if(!S.busy)renderPlay()})});
   const sel=$('gameSel');
   GAMES.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>sel.append(el('option',{value:g.id},g.name)));
   sel.addEventListener('change',()=>startGame(sel.value));
@@ -305,6 +339,7 @@ function boot(){
   buildHome();
   addEventListener('hashchange',route);addEventListener('popstate',route);
   route();
-  Online.init();
+  let vs=null;try{vs=new URL(location.href).searchParams.get('vs')}catch(e){}
+  askNames(!!vs).then(()=>Online.init());
 }
 if(typeof document!=='undefined') boot();
