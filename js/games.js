@@ -673,6 +673,13 @@ const SDK={
     return{grid,sol};
   }
 };
+/* a fresh puzzle with its boosters; hard leaves fewer numbers to start from */
+function sdkBoard(diff){
+  const {grid,sol}=SDK.make(diff==='hard'?R(23,26):R(32,36)),boost=Array(81).fill(1);
+  const empty=shuffle(grid.map((d,i)=>d?-1:i).filter(i=>i>=0));
+  empty.slice(0,4).forEach(i=>boost[i]=3);empty.slice(4,12).forEach(i=>boost[i]=2);
+  return{grid,sol,given:grid.map(d=>d?1:0),boost,own:Array(81).fill(-1),diff};
+}
 /* two ways to play: take turns (30 s a turn, optional clock each), or rapid fire (everyone at once, one game clock) */
 const sdkNow=()=>Date.now()+(typeof Online!=='undefined'?Online.offset:0);
 const sdkCount=s=>s.n+s.out[0]+s.out[1]+(s.skips||0);
@@ -702,20 +709,15 @@ function sdkEffect(l){
 }
 
 def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
-  blurb:'One sudoku, two players, bonus squares. Take turns, or race each other in rapid fire.',
+  blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty.',
-    'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.',
-    'Rapid fire: no turns. Both players place numbers as fast as they like until the board is full or the 3 or 5 minute game clock ends.'],
+    'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the 3 or 5 minute game clock ends.',
+    'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.'],
   win:'When the board is full or time is up, the higher score wins. A tie is possible.',
   how:'Click an empty square, then a number.',
-  create:()=>{
-    const {grid,sol}=SDK.make(R(32,36)),boost=Array(81).fill(1);
-    const empty=shuffle(grid.map((d,i)=>d?-1:i).filter(i=>i>=0));
-    empty.slice(0,4).forEach(i=>boost[i]=3);empty.slice(4,12).forEach(i=>boost[i]=2);
-    return{grid,sol,given:grid.map(d=>d?1:0),boost,own:Array(81).fill(-1),score:[0,0],n:0,last:null,
-      mode:'turns',turnLimit:30000,limit:0,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0};
-  },
+  create:()=>({...sdkBoard('medium'),score:[0,0],n:0,last:null,
+      mode:'rapid',turnLimit:30000,limit:180000,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0}),
   moves:s=>s.mode==='rapid'||s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].map(d=>sdkPlace(s,i,d,0))),
   hasMove:(s,p)=>s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
   anyTurn:s=>s.mode==='rapid',
@@ -723,7 +725,7 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
   demoMove:s=>{
     const empty=s.grid.map((v,i)=>v?-1:i).filter(i=>i>=0);
     const i=Math.random()<.35?(empty.find(i=>s.boost[i]>1)??pick(empty)):pick(empty);
-    return sdkPlace(s,i,Math.random()<.75?s.sol[i]:pick([1,2,3,4,5,6,7,8,9].filter(d=>d!==s.sol[i])),0);
+    return sdkPlace(s,i,Math.random()<.75?s.sol[i]:pick([1,2,3,4,5,6,7,8,9].filter(d=>d!==s.sol[i])),0,s.mode==='rapid'?R(0,1):s.turn);
   },
   result:s=>{
     const timeUp=s.mode==='rapid'?s.ended:s.out[0]&&s.out[1];
@@ -749,7 +751,9 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
       const pick2=(label,on,next)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(on)},label);
         b.disabled=!ctx.live;b.addEventListener('click',()=>{if(!on)ctx.configure({...clone(s),...next})});return b};
       const row=(label,...b)=>el('div',{class:'sdk-opt'},el('span',{class:'role'},label),...b);
-      const rows=[row('Mode',pick2('Take turns',!rapid,{mode:'turns',limit:0,clock:[0,0]}),pick2('Rapid fire',rapid,{mode:'rapid',limit:180000,clock:[0,0]}))];
+      const diff=s.diff||'medium',level=(label,d)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(diff===d)},label);
+        b.disabled=!ctx.live;b.addEventListener('click',()=>{if(diff!==d)ctx.configure({...clone(s),...sdkBoard(d)})});return b};
+      const rows=[row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:180000,clock:[0,0]}),pick2('Take turns',!rapid,{mode:'turns',limit:0,clock:[0,0]}))];
       if(rapid) rows.push(row('Game time',pick2('3 min',s.limit===180000,{limit:180000}),pick2('5 min',s.limit===300000,{limit:300000})));
       else rows.push(row('Per turn',pick2('30 s',!!s.turnLimit,{turnLimit:30000}),pick2('No limit',!s.turnLimit,{turnLimit:0})),
         row('Clock',pick2('Off',!s.limit,{limit:0,clock:[0,0]}),pick2('3 min each',s.limit===180000,{limit:180000,clock:[180000,180000]}),pick2('5 min each',s.limit===300000,{limit:300000,clock:[300000,300000]})));

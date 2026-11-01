@@ -57,6 +57,11 @@ function fitBox(box){
   const cs=getComputedStyle(box),avail=box.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
   const w=Math.max(c.scrollWidth,c.offsetWidth);
   if(avail>0&&w>avail+1) box.style.setProperty('--fit',Math.max(.4,avail/w).toFixed(3));
+  /* on a phone, small boards grow into the spare room so squares are easier to tap */
+  else if(avail>0&&box.id==='board'&&innerWidth<=600){
+    const h=Math.max(c.scrollHeight,c.offsetHeight),z=Math.min(1.5,(avail-4)/w,innerHeight*.55/Math.max(1,h));
+    if(z>1.05) box.style.setProperty('--fit',z.toFixed(3));
+  }
 }
 /* make an svg node behave like a button */
 function act(n,fn,label){

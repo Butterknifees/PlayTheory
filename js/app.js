@@ -148,6 +148,7 @@ function nextRandom(){
 /* ---------- home: a card for every game ---------- */
 const FILTERS=[['all','All games'],['new','New'],['Partizan',KIND.Partizan],['Impartial',KIND.Impartial],['Scoring',KIND.Scoring]];
 let filter='all',previewObs=null;
+const FEATURED='duosudoku';
 function view(v){
   const home=v==='home';
   $('home').hidden=!home;$('table').hidden=home;$('crumb').hidden=home;
@@ -184,13 +185,35 @@ function drawPreview(box){
   try{const st=g.create();st.turn=0;const n=g.render(st,{live:false,ui:{},play(){},redraw(){},say(){},busy(){}});
     box.replaceChildren(n);Skins.decorate(g.id,box);fitPreview(box)}catch(e){console.error(e)}
 }
+/* the featured game gets a big card of its own, with a board already part way through */
+function buildFeatured(){
+  const box=$('featured'),g=GAMES.find(x=>x.id===FEATURED);
+  if(!g){box.hidden=true;return}
+  if(box.firstChild)return;
+  const prev=el('div',{class:'gprev feat-prev','data-game':g.id,'aria-hidden':'true'});
+  const card=el('button',{class:'gcard feat',type:'button','aria-label':`Play ${g.name}`},
+    prev,el('div',{class:'gbody'},
+      el('div',{class:'gmeta'},el('span',{class:'chip new'},'Featured'),el('span',{class:'chip'},KIND[g.kind]||g.kind)),
+      el('h3',{},g.name),el('p',{},g.blurb),
+      el('span',{class:'btn primary feat-go'},'Play now')));
+  card.addEventListener('click',()=>{Sound.unlock();startGame(g.id)});
+  box.replaceChildren(card);
+  try{let st=g.create();st.turn=0;
+    if(g.demoMove)for(let k=0;k<14;k++)st=g.demoMove(st);
+    st.last=null;
+    prev.classList.add('drawn');
+    prev.replaceChildren(g.render(st,{live:false,ui:{},play(){},redraw(){},say(){},busy(){}}));
+    Skins.decorate(g.id,prev);requestAnimationFrame(()=>fitPreview(prev));
+  }catch(e){console.error(e)}
+}
 function buildHome(){
   const f=$('filters');
   f.replaceChildren(...FILTERS.map(([k,label])=>{
     const b=el('button',{class:'fchip',type:'button','aria-pressed':String(k===filter)},label);
     b.addEventListener('click',()=>{filter=k;buildHome()});return b;
   }));
-  const list=GAMES.filter(g=>filter==='all'||(filter==='new'?g.isNew:g.kind===filter))
+  buildFeatured();
+  const list=GAMES.filter(g=>filter==='all'?g.id!==FEATURED:(filter==='new'?g.isNew:g.kind===filter))
     .sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
   if(previewObs) previewObs.disconnect();
   previewObs=typeof IntersectionObserver==='function'?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){previewObs.unobserve(e.target);drawPreview(e.target)}}),{rootMargin:'200px'}):null;
