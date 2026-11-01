@@ -43,6 +43,7 @@ function celebrate(){
   const w=S.over.winner;
   if(w==='draw'){Sound.fx('draw');return}
   Sound.fx('win',{id:S.gid});
+  Mascot.cheer(name(w));
   FX.confetti([FX.color(PC[w]),FX.cssVar('--brand-blue'),'#ffffff',w===0?'#9cc3ea':'#7d7d7d']);
 }
 
@@ -134,6 +135,7 @@ function showIntro(){
   setTimeout(()=>{try{go.focus({preventScroll:true})}catch(e){}},50);
 }
 function enterGame(){
+  Mascot.preload(); // fetch the bow now so it's ready when someone wins
   Sound.unlock().then(()=>{Sound.fx('enter',{id:S.gid});Music.play(S.gid);updateNowPlaying()});
   const box=$('intro');box.classList.add('out');setTimeout(()=>{if(box.classList.contains('out'))box.hidden=true},600);
   S.entering=true;renderPlay();
@@ -152,6 +154,7 @@ function updateNowPlaying(){
 }
 
 function newPosition(animate,dealt){
+  Mascot.hide();
   S.state=S.game.create();S.state.turn=S.starter;S.hist=[];S.who=[];S.ui={};S.busy=false;
   renderInfo();S.entering=!!animate;renderPlay();
   Demo.start(S.game,$('demoBox'),$('demoCap'));
@@ -183,7 +186,7 @@ function setRoute(id){
   if(location.hash!==h){try{history.pushState(null,'',h)}catch(e){location.hash=h}}
 }
 function goHome(){
-  closeSheet();Demo.stop();Music.stop();
+  Mascot.hide();closeSheet();Demo.stop();Music.stop();
   const intro=$('intro');intro.hidden=true;intro.classList.remove('playing');
   view('home');setRoute(null);updateNowPlaying();
   try{window.scrollTo({top:0})}catch(e){}
