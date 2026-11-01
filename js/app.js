@@ -121,6 +121,8 @@ function enterGame(){
   const box=$('intro');box.classList.add('out');setTimeout(()=>{if(box.classList.contains('out'))box.hidden=true},600);
   S.entering=true;renderPlay();
   $('howBtn').classList.toggle('nudge',!S.sawHow);
+  /* playing someone on another device: offer the link or room straight away */
+  if(S.remote&&!Online.on) setTimeout(()=>{if(!Online.on&&document.body.dataset.view==='play')Online.open()},650);
 }
 
 function updateNowPlaying(){
@@ -286,24 +288,26 @@ function applyNames(){
 }
 function askNames(join){
   return new Promise(done=>{
-    const d=$('nameDlg'),f=$('nameForm');let away=join;
+    const d=$('nameDlg'),f=$('nameForm');let away=true;
     const field=ph=>el('input',{class:'name-in',maxlength:'16',autocomplete:'off',placeholder:ph,'aria-label':ph,enterkeyhint:'next'});
     const me=field('Your name'),opp=field('Your opponent’s name');
     const oppRow=el('label',{class:'name-row'},el('span',{class:'dot r'}),opp);
     const go=el('button',{class:'btn primary big',type:'submit'},join?'Join the game':'Let’s play');
     const sw=el('button',{class:'name-sw',type:'button'});
-    const draw=()=>{oppRow.hidden=away;sw.hidden=join;sw.textContent=away?'We’re sharing this screen':'My opponent is on another device';
+    const title=el('h2',{}),note=el('p',{}),meDot=el('span',{class:'dot l'});
+    const draw=()=>{oppRow.hidden=away;meDot.hidden=away;sw.hidden=join;sw.textContent=away?'Playing on one screen? Add the other player':'My opponent is on another device';
+      title.textContent=join?'You’ve been challenged!':away?'What’s your name?':'Who’s playing?';
+      note.textContent=join?'Tell your friend who you are.':away?'It’s used in every game you play here until you refresh the page.':'Add both names. They’re used in every game until you refresh the page.';
       go.disabled=!me.value.trim()||(!away&&!opp.value.trim())};
-    f.replaceChildren(el('h2',{},join?'You’ve been challenged!':'Who’s playing?'),
-      el('p',{},join?'Tell your friend who you are.':'Add both names. They’re used in every game you play here until you refresh the page.'),
-      el('label',{class:'name-row'},join?null:el('span',{class:'dot l'}),me),oppRow,sw,go);
+    f.replaceChildren(title,note,
+      el('label',{class:'name-row'},meDot,me),oppRow,sw,go);
     me.addEventListener('input',draw);opp.addEventListener('input',draw);
     sw.addEventListener('click',()=>{away=!away;draw();(away?go:opp).focus()});
     me.addEventListener('keydown',e=>{if(e.key==='Enter'&&!away&&!opp.value.trim()){e.preventDefault();opp.focus()}});
     d.addEventListener('cancel',e=>e.preventDefault());
     f.addEventListener('submit',e=>{
       e.preventDefault();if(go.disabled)return;
-      S.me=me.value.trim();S.opp=away?'':opp.value.trim();
+      S.me=me.value.trim();S.opp=away?'':opp.value.trim();S.remote=away;
       try{d.close()}catch(x){d.removeAttribute('open')}
       applyNames();done();
     });

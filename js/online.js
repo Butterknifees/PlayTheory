@@ -266,5 +266,5 @@ const Online=(()=>{
       open();run('Joining the challenge…',()=>accept(m).then(close));
     }
   }
-  return {init,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get me(){return st.me},get offset(){return offset}};
+  return {init,open,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get me(){return st.me},get offset(){return offset}};
 })();

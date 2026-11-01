@@ -14,7 +14,7 @@ const O4=[[1,0],[-1,0],[0,1],[0,-1]];
 const orList=a=>a.length===1?String(a[0]):a.slice(0,-1).join(', ')+' or '+a[a.length-1];
 
 /* app state */
-const S={gid:null,game:null,state:null,hist:[],who:[],starter:0,over:null,ui:{},bag:[],names:['',''],me:'',opp:'',hint:null,busy:false,entering:false};
+const S={gid:null,game:null,state:null,hist:[],who:[],starter:0,over:null,ui:{},bag:[],names:['',''],me:'',opp:'',remote:false,hint:null,busy:false,entering:false};
 const name=p=>(S.names[p]||'').trim()||SIDE[p];
 /* rules are written with Left and Right; show the players' names instead */
 const pn=t=>t==null?t:String(t).replace(/\bLeft\b/g,name(0)).replace(/\bRight\b/g,name(1));
