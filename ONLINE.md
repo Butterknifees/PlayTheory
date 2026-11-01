@@ -22,7 +22,7 @@ Players never make accounts. Each device gets an anonymous ID, so a match knows 
 1. Go to **Build → Realtime Database → Create database**. Pick the location nearest to you and start in **locked mode**.
 2. Open the **Rules** tab and replace everything there with the contents of [`database.rules.json`](database.rules.json). Click **Publish**.
 
-   These rules let only the person who created a challenge and the one friend who accepted it read or change that match. They also let room codes point at a match. If you set up the rules before room codes existed, paste them again; until you do, **Make a room** still works but only gives a link.
+   These rules let only the person who created a challenge and the one friend who accepted it read or change that match. Nobody can take over the other player's seat, change the other player's name, or store anything the game doesn't use. Room codes point at a match, last a day, and stop working once a friend joins. Whenever `database.rules.json` changes, paste it in again and publish.
 
 ## 4. Connect the site
 
@@ -44,10 +44,26 @@ Players never make accounts. Each device gets an anonymous ID, so a match knows 
 
 The `apiKey` is meant to be public. It only identifies the project. What keeps matches private is the database rules from step 3.
 
+To stop the key being used for other Google services, open <https://console.cloud.google.com/apis/credentials> for the project, edit the **Browser key**, and:
+
+- under **API restrictions**, allow only Identity Toolkit API, Token Service API, Firebase Realtime Database API and Firebase App Check API;
+- under **Website restrictions**, add `playtheoryhq.com/*` and `butterknifees.github.io/*`.
+
+## 5. Turn on App Check (recommended)
+
+App Check makes Firebase accept requests only from your site, so nobody can script thousands of matches and use up the free plan.
+
+1. Go to <https://www.google.com/recaptcha/admin/create>, make a **reCAPTCHA v3** key, and add the domains `playtheoryhq.com` and `butterknifees.github.io`.
+2. In the Firebase console, open **Build → App Check**, register the web app with the reCAPTCHA v3 provider and paste the key's **secret**.
+3. Put the key's **site key** in `APP_CHECK_SITE_KEY` in [`js/firebase-config.js`](js/firebase-config.js), then commit and push.
+4. Play an online match to check it works, then in **App Check → APIs**, click **Enforce** for Realtime Database. (Enforce only after the site sends App Check tokens, or online play stops working.)
+
 ## Good to know
 
 - A challenge link works for exactly one friend. Whoever opens it first becomes black, and anyone else who opens it is told the challenge was already accepted.
 - If either player refreshes the page, they rejoin the same match, because the link stays in the address bar.
 - Either player can deal a new game, start a new position or change who moves first. Each player can undo only their own last move.
-- Old matches stay in the database. They're tiny, but you can delete the `matches` node in the console whenever you like.
+- Finished and abandoned matches stay in the database, and players can't delete them, so the games can be used to train a bot. Each match's `created` time says when it started. Delete matches older than 30 days from the console. Tapping **End online match** frees the room code but keeps the match.
+- Every move is also saved once under `logs/<match id>/<move number>`: the move type (`k`), who made it (`b`: 0 is blue, 1 is black), the game (`g`), the position after the move as JSON (`s`) and the server time (`t`). This is the full game from start to finish, for training a bot. Players can add to it but can't read, change or delete it. Export it from the console (**⋮ → Export JSON**) and delete old entries there too.
+- Moves are checked on each player's device, not by the database, so a friend who knows their way around browser developer tools could still cheat. Only play people you trust for anything that matters.
 - Online play doesn't work in the claude.ai preview, because that page can't reach Firebase. Use the GitHub Pages site.

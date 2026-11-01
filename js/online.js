@@ -7,6 +7,14 @@
    Without FIREBASE_CONFIG (js/firebase-config.js) this stays off and the game is one screen only. */
 const Online=(()=>{
   const SDK='https://cdn.jsdelivr.net/npm/firebase@10.12.2/';
+  /* checksums of the exact SDK files, so a tampered copy on the CDN is refused instead of run */
+  const SRI={
+    'firebase-app-compat.js':'sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9',
+    'firebase-auth-compat.js':'sha384-TnlRYaR4JYz/lpaGuaiU61PjNberSA4vjLjtF+oRC/IkohkJqnWxw5EmDSOt1vA1',
+    'firebase-database-compat.js':'sha384-1/m+A1jVWbD3yiK3/vtFvm1+LjK1WLpSoDY+Kaxppwn/yP9BVSgdHTNQVOjrzUO5',
+    'firebase-app-check-compat.js':'sha384-E3vxFxXu8FhW5kvqdQJ5Yf8ugrV7iCJP8jgnItRH2Rk8Q08cJzJGTi/oMC3FEp3j'
+  };
+  const CODE_TTL=24*60*60*1000; // room codes stop working after a day (database.rules.json says the same)
   const ID_CHARS='abcdefghijkmnpqrstuvwxyz23456789',CODE_CHARS='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const st={on:false,me:0};
   let db=null,uid=null,ref=null,id=null,seq=0,lastTok=null,lastData=null,offset=0,applying=false,fresh=false,match=null,sdkP=null,nameT=null,replayT=null,err='',busyMsg='',mode='link',codeDraft='';
@@ -15,12 +23,16 @@ const Online=(()=>{
   const link=()=>location.origin+location.pathname+'?vs='+id;
 
   /* ---------- connection ---------- */
-  function script(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('Could not load the online service. Check your connection.'));document.head.append(s)})}
+  function script(f){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=SDK+f;s.integrity=SRI[f];s.crossOrigin='anonymous';s.onload=ok;s.onerror=()=>no(new Error('Could not load the online service. Check your connection.'));document.head.append(s)})}
   function connect(){
     if(sdkP) return sdkP;
     sdkP=(async()=>{
-      if(!window.firebase){await script(SDK+'firebase-app-compat.js');await Promise.all([script(SDK+'firebase-auth-compat.js'),script(SDK+'firebase-database-compat.js')])}
-      if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      const appCheck=typeof APP_CHECK_SITE_KEY==='string'&&APP_CHECK_SITE_KEY;
+      if(!window.firebase){await script('firebase-app-compat.js');await Promise.all([script('firebase-auth-compat.js'),script('firebase-database-compat.js'),appCheck&&script('firebase-app-check-compat.js')])}
+      if(!firebase.apps.length){
+        firebase.initializeApp(FIREBASE_CONFIG);
+        if(appCheck) firebase.appCheck().activate(appCheck,true); // proves requests come from this site, not a script
+      }
       const cred=await firebase.auth().signInAnonymously();
       uid=cred.user.uid;db=firebase.database();
       db.ref('.info/serverTimeOffset').on('value',s=>{offset=s.val()||0});
@@ -28,6 +40,7 @@ const Online=(()=>{
     sdkP.catch(()=>{sdkP=null});
     return sdkP;
   }
+  const denied=e=>/permission.denied/i.test((e&&(e.code||e.message))||'');
   const snap=()=>JSON.stringify({gid:S.gid,state:S.state,hist:S.hist.slice(-60),who:S.who.slice(-60),starter:S.starter});
 
   /* ---------- making and accepting a challenge ---------- */
@@ -38,7 +51,7 @@ const Online=(()=>{
     for(let i=0;i<5;i++){
       const m=rand(ID_CHARS,12),data=snap();
       const res=await db.ref('matches/'+m).transaction(r=>r===null?{v:1,host:uid,created:Date.now(),seq:1,kind:'game',by:0,snap:data,names:{L:S.me||S.names[0]||''}}:undefined);
-      if(res.committed){seq=1;lastTok=null;fresh=false;await roomCode(m);return enter(m,0)}
+      if(res.committed){seq=1;lastTok=null;fresh=false;record(m,res.snapshot.val());await roomCode(m);return enter(m,0)}
     }
     throw new Error('Could not start a match. Try again.');
   }
@@ -47,9 +60,11 @@ const Online=(()=>{
     try{
       for(let i=0;i<6;i++){
         const c=rand(CODE_CHARS,5);
-        const res=await db.ref('codes/'+c).transaction(r=>r===null?{m,host:uid,at:Date.now()}:undefined);
-        if(res.committed){await db.ref('matches/'+m+'/code').set(c);return c}
+        /* the rules refuse a code that is taken and still fresh, so a refusal just means try another */
+        try{await db.ref('codes/'+c).set({m,host:uid,at:firebase.database.ServerValue.TIMESTAMP})}catch(e){if(denied(e))continue;throw e}
+        await db.ref('matches/'+m+'/code').set(c);return c;
       }
+      console.warn('Could not get a room code. Are the database rules up to date?');
     }catch(e){console.warn('Room codes are not enabled in the database rules yet.',e)}
     return null;
   }
@@ -57,13 +72,15 @@ const Online=(()=>{
     const c=String(raw||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
     if(c.length!==5) throw new Error('Room codes have 5 letters and numbers.');
     await connect();
-    const r=(await db.ref('codes/'+c).get()).val();
-    if(!r||!r.m) throw new Error(`No room called ${c}. Check the code and try again.`);
+    let r=null;
+    try{r=(await db.ref('codes/'+c).get()).val()}catch(e){if(!denied(e))throw e} // expired or already joined
+    if(!r||!r.m) throw new Error(`No open room called ${c}. Check the code. Codes last a day and work for one friend.`);
     return accept(r.m);
   }
   async function accept(m){
     await connect();
-    const r=(await db.ref('matches/'+m).get()).val();
+    let r;
+    try{r=(await db.ref('matches/'+m).get()).val()}catch(e){if(denied(e))throw new Error('Someone else already joined this match.');throw e}
     if(!r) throw new Error('This match has ended or does not exist.');
     if(r.host===uid){seq=0;fresh=true;return enter(m,0)}
     const res=await db.ref('matches/'+m+'/guest').transaction(g=>(g===null||g===uid)?uid:undefined);
@@ -78,6 +95,12 @@ const Online=(()=>{
     ref.on('value',s=>receive(s.val()));
     setURL(m);document.body.classList.add('online');
     names();bar();if(!S.busy) renderPlay();
+  }
+  /* the host ending a match frees its room code; the match itself is kept (games are saved for a bot to learn from) */
+  function end(){
+    const code=st.on&&st.me===0&&match&&match.code;
+    if(code) db.ref('codes/'+code).remove().catch(()=>{});
+    leave();
   }
   function leave(msg){
     if(!st.on) return;
@@ -98,7 +121,7 @@ const Online=(()=>{
      moment (rapid fire) are merged instead of one being lost */
   function push(kind,op){
     if(!st.on||applying||!ref) return;
-    const base=seq,data=snap(),tok=uid+':'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);lastTok=tok;lastData=data;
+    const m=id,base=seq,data=snap(),tok=uid+':'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);lastTok=tok;lastData=data;
     ref.transaction(r=>{
       if(!r) return;
       if((r.seq||0)===base){r.seq=base+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=data;return r}
@@ -106,7 +129,14 @@ const Online=(()=>{
       let d;try{d=JSON.parse(r.snap)}catch(e){return}
       const n=op(d.state);if(!n) return;
       d.state=n;r.seq=(r.seq||0)+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=JSON.stringify(d);return r;
-    }).catch(e=>note('Could not send that: '+e.message));
+    }).then(res=>{if(res.committed)record(m,res.snapshot.val())}).catch(e=>note('Could not send that: '+e.message));
+  }
+  /* every change is also written once to logs/<match>/<seq>, which nobody listens to, so whole games
+     are kept for training a bot (the match itself only holds the last 60 positions) */
+  function record(m,r){
+    if(!r||!r.seq) return;
+    let d;try{d=JSON.parse(r.snap)}catch(e){return}
+    db.ref('logs/'+m+'/'+r.seq).set({k:r.kind,b:r.by,g:d.gid,s:JSON.stringify(d.state),t:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
   }
   function setName(p){
     if(!st.on||p!==st.me) return;
@@ -165,6 +195,7 @@ const Online=(()=>{
   const mayUndo=()=>!st.on||(S.who.length>0&&S.who[S.who.length-1]===st.me);
   const friendHere=()=>!!(match&&match.guest&&match.online&&match.online[PC[other()]]);
   const friendJoined=()=>!!(match&&match.guest);
+  const liveCode=()=>match&&match.code&&!(match.created&&Date.now()+offset-match.created>CODE_TTL)?match.code:null;
 
   /* ---------- interface ---------- */
   function names(){
@@ -180,7 +211,7 @@ const Online=(()=>{
     $('onlineBtn').setAttribute('aria-pressed',String(st.on));
     if(!st.on){nb.hidden=true;if($('onlineDlg').open)panel();return}
     nb.hidden=false;
-    const them=name(other()),code=match&&match.code;
+    const them=name(other()),code=liveCode();
     const status=!friendJoined()?(code?`Waiting for your friend · Room ${code}`:'Waiting for your friend to open the link'):friendHere()?`${them} is here`:`${them} is away`;
     const inv=el('button',{class:'btn small',type:'button'},friendJoined()?'Match':'Invite');inv.addEventListener('click',open);
     nb.className='netbar'+(friendHere()?' here':'');
@@ -229,9 +260,9 @@ const Online=(()=>{
       const share=el('button',{class:'btn primary big',type:'button',autofocus:''},navigator.share&&touchUI()?'Share link':'Copy link');
       share.addEventListener('click',()=>shareLink(share));
       const quit=el('button',{class:'btn',type:'button'},'End online match');
-      quit.addEventListener('click',()=>{leave();close()});
+      quit.addEventListener('click',()=>{end();close()});
       const back=el('button',{class:'btn',type:'button'},'Back to the board');back.addEventListener('click',close);
-      const code=match&&match.code,codeBox=code?el('div',{class:'room-code','aria-label':'Room code '+code.split('').join(' ')},...code.split('').map(ch=>el('span',{},ch))):null;
+      const code=liveCode(),codeBox=code?el('div',{class:'room-code','aria-label':'Room code '+code.split('').join(' ')},...code.split('').map(ch=>el('span',{},ch))):null;
       const room=mode==='room'&&code&&!friendJoined();
       kids.push(el('h2',{},friendJoined()?`Playing ${name(other())}`:room?'Your room':'Your challenge link'),
         friendJoined()?el('p',{},`You play ${CNAME[PC[st.me]]} on this device. ${friendHere()?name(other())+' is connected.':name(other())+' is away right now; moves will show up when they are back.'}`)

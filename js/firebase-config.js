@@ -8,3 +8,6 @@ const FIREBASE_CONFIG={
   projectId:"play-theory",
   appId:"1:240543726043:web:821f222abc546b16f68ffe"
 };
+/* Optional: a reCAPTCHA v3 site key for Firebase App Check, which stops scripts outside the site from using
+   the database. Leave it empty until you've set App Check up (ONLINE.md, step 5). */
+const APP_CHECK_SITE_KEY="";

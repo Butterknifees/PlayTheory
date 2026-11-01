@@ -2,25 +2,89 @@
   "rules": {
     "matches": {
       "$id": {
-        ".read": "auth != null && $id.matches(/^[a-z0-9]{12}$/)",
-        ".write": "auth != null && ((!data.exists() && newData.child('host').val() === auth.uid) || data.child('host').val() === auth.uid || data.child('guest').val() === auth.uid)",
-        ".validate": "$id.matches(/^[a-z0-9]{12}$/) && newData.hasChildren(['host', 'seq', 'snap'])",
-        "guest": {
-          ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+        ".read": "auth != null && $id.matches(/^[a-z0-9]{12}$/) && (!data.exists() || !data.child('guest').exists() || data.child('host').val() === auth.uid || data.child('guest').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && newData.child('host').val() === auth.uid) || (newData.exists() && (data.child('host').val() === auth.uid || data.child('guest').val() === auth.uid)))",
+        ".validate": "$id.matches(/^[a-z0-9]{12}$/) && newData.hasChildren(['host', 'seq', 'snap']) && (!data.exists() || (newData.child('host').val() === data.child('host').val() && (!data.child('guest').exists() || newData.child('guest').val() === data.child('guest').val())))",
+        "host": {
+          ".validate": "newData.isString() && (data.exists() ? newData.val() === data.val() : newData.val() === auth.uid)"
         },
-        "snap": {
-          ".validate": "newData.isString() && newData.val().length < 500000"
+        "guest": {
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".validate": "newData.isString() && (data.exists() ? newData.val() === data.val() : newData.val() === auth.uid)"
         },
         "seq": {
+          ".validate": "newData.isNumber() && (data.exists() ? newData.val() === data.val() + 1 : newData.val() === 1)"
+        },
+        "snap": {
+          ".validate": "newData.isString() && newData.val().length < 200000"
+        },
+        "by": {
+          ".validate": "newData.val() === (newData.parent().child('host').val() === auth.uid ? 0 : 1)"
+        },
+        "kind": {
+          ".validate": "newData.isString() && newData.val().length <= 12"
+        },
+        "tok": {
+          ".validate": "newData.isString() && newData.val().length <= 80"
+        },
+        "v": {
           ".validate": "newData.isNumber()"
+        },
+        "created": {
+          ".validate": "newData.isNumber()"
+        },
+        "code": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Z2-9]{5}$/)"
+        },
+        "names": {
+          "$side": {
+            ".validate": "newData.isString() && newData.val().length <= 40 && (newData.val() === data.val() || ($side === 'L' && newData.parent().parent().child('host').val() === auth.uid) || ($side === 'R' && newData.parent().parent().child('guest').val() === auth.uid))"
+          }
+        },
+        "online": {
+          "$side": {
+            ".validate": "newData.isBoolean() && (newData.val() === data.val() || ($side === 'L' && newData.parent().parent().child('host').val() === auth.uid) || ($side === 'R' && newData.parent().parent().child('guest').val() === auth.uid))"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "logs": {
+      "$id": {
+        "$seq": {
+          ".write": "auth != null && !data.exists() && (root.child('matches').child($id).child('host').val() === auth.uid || root.child('matches').child($id).child('guest').val() === auth.uid)",
+          ".validate": "$id.matches(/^[a-z0-9]{12}$/) && $seq.matches(/^[0-9]{1,6}$/) && newData.hasChildren(['k', 'b', 'g', 's', 't'])",
+          "k": {
+            ".validate": "newData.isString() && newData.val().length <= 12"
+          },
+          "b": {
+            ".validate": "newData.val() === (root.child('matches').child($id).child('host').val() === auth.uid ? 0 : 1)"
+          },
+          "g": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "s": {
+            ".validate": "newData.isString() && newData.val().length < 20000"
+          },
+          "t": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     },
     "codes": {
       "$code": {
-        ".read": "auth != null",
-        ".write": "auth != null && !data.exists() && newData.child('host').val() === auth.uid",
-        ".validate": "$code.matches(/^[A-Z2-9]{5}$/) && newData.child('m').isString() && newData.child('m').val().matches(/^[a-z0-9]{12}$/)"
+        ".read": "auth != null && data.child('at').val() > now - 86400000 && !root.child('matches').child(data.child('m').val()).child('guest').exists()",
+        ".write": "auth != null && ((newData.child('host').val() === auth.uid && (!data.exists() || data.child('at').val() <= now - 86400000)) || (!newData.exists() && data.child('host').val() === auth.uid))",
+        ".validate": "$code.matches(/^[A-Z2-9]{5}$/) && newData.hasChildren(['m', 'host', 'at']) && newData.child('m').isString() && newData.child('m').val().matches(/^[a-z0-9]{12}$/) && root.child('matches').child(newData.child('m').val()).child('host').val() === auth.uid && newData.child('at').val() === now",
+        "$other": {
+          ".validate": false
+        }
       }
     }
   }
