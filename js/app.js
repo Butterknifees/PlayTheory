@@ -58,9 +58,17 @@ function renderInfo(){
   $('gameSel').value=g.id;
 }
 
+/* music plays only while a game is in progress and the page is on screen */
+function syncMusic(){
+  const want=!S.over&&!document.hidden&&document.body.dataset.view==='play'&&($('intro').hidden||$('intro').classList.contains('out')),was=Music.current;
+  if(want&&!was) Music.play(S.gid); else if(!want&&was) Music.stop();
+  if(Music.current!==was) updateNowPlaying();
+}
+
 function renderPlay(moved){
   if(!S.state) return;
   check();
+  syncMusic();
   const s=S.state,over=S.over;
   $('play').dataset.turn=over?'':s.turn;
   const t=$('turn');t.className='turn t'+s.turn+(moved?' bump':'');
@@ -349,6 +357,10 @@ function boot(){
   updateNowPlaying();
   buildHome();
   addEventListener('hashchange',route);addEventListener('popstate',route);
+  /* switching tab or app, or locking the phone, silences everything; coming back picks the music up again */
+  const away=()=>{Music.stop();const ac=Sound.ac;if(ac&&ac.state==='running')ac.suspend().catch(()=>{});updateNowPlaying()};
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)away();else if(Sound.ac){Sound.unlock();if(S.state)syncMusic()}});
+  addEventListener('pagehide',away);
   route();
   let vs=null;try{vs=new URL(location.href).searchParams.get('vs')}catch(e){}
   askNames(!!vs).then(()=>Online.init());
