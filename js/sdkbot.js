@@ -55,8 +55,9 @@ const SdkBot=(()=>{
     const f=fs[k],m=mood(s,p,P,now),y=yield_(s,p,P,now),ok=!(y&&Math.random()<.3)&&Math.random()<pOk(f,P,m),bad=f.c.filter(d=>d!==s.sol[f.i]);
     const d=ok?s.sol[f.i]:pick(bad.length?bad:DIG.filter(d=>d!==s.sol[f.i]));
     const ms=Math.round(wait(f,P,s,m)*(y?3:1)*Math.exp(P.jit*(m<0?1+.25*m:1)*gauss())); // focused players pause less
-    /* must lose: never play a right number that would draw level or go ahead; keep thinking ({wait}), or now and then fumble one */
-    if(P.goal==='lose'&&d===s.sol[f.i]&&s.score[p]+sdkValue(s,d)*s.boost[f.i]>=s.score[1-p]){
+    /* must lose: never play a right number that would draw level or go ahead (in the opening, more than 3 ahead, so it doesn't sit idle);
+       keep thinking ({wait}), or now and then fumble one */
+    if(P.goal==='lose'&&d===s.sol[f.i]&&s.score[p]+sdkValue(s,d)*s.boost[f.i]>=s.score[1-p]+(prog(s,now)<.2?4:0)){
       if(Math.random()<.25)return{i:f.i,d:pick(bad.length?bad:DIG.filter(d=>d!==s.sol[f.i])),ms};
       return s.mode==='rapid'?{wait:1,ms}:{skip:1,ms:Math.min(ms,s.turnLimit||ms)};
     }
