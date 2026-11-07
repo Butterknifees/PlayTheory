@@ -631,8 +631,8 @@ div.sc{cursor:default}
   .logo{width:34px;height:34px}
   h1{font-size:23px}
   .tag{display:none}
-  .sound{order:2;gap:4px}
-  .tog{padding:8px;border-radius:50%}
+  .sound{order:2;gap:3px}
+  .tog{padding:7px;border-radius:50%}
   .tog .tlabel{display:none}
   .tog svg{width:17px;height:17px}
   .players{order:3;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -697,10 +697,11 @@ div.sc{cursor:default}
   .focus .sdk-pads.one>*{grid-column:3}
   .focus .sdk-scores{max-width:calc(var(--sk)*9 + 18px)}
 }
-@media (max-width:380px){
+@media (max-width:420px){
   h1{font-size:20px}
   .logo{width:30px;height:30px}
-  .tog{padding:7px}
+  .brand{gap:8px}
+  .tog{padding:6px}
   .tog svg{width:16px;height:16px}
 }
 
@@ -726,3 +727,34 @@ div.sc{cursor:default}
 @keyframes mascot-in{from{opacity:0;transform:translate(-50%,70px)}}
 @keyframes mascot-out{to{opacity:0;transform:translate(-50%,50px)}}
 @media (max-width:600px){.mascot{width:130px}.mascot-say{font-size:14px;padding:8px 14px}.mascot-say b{font-size:20px}}
+
+/* loading screen (js/loader.js): a little grid fills in, blue and black taking turns, over a sudoku fact */
+.loader{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:24px 16px;background:var(--bg);text-align:center;transition:opacity .4s ease,visibility .4s}
+.loader.out{opacity:0;visibility:hidden}
+.ld-grid{display:grid;grid-template-columns:repeat(3,44px);grid-auto-rows:44px;gap:3px;padding:3px;background:var(--charcoal);border-radius:10px;margin-bottom:8px}
+.ld-grid i{display:grid;place-items:center;background:var(--surface);border-radius:4px;font:800 22px var(--f-display);font-style:normal;color:var(--left)}
+.ld-grid i:nth-child(even){color:var(--right)}
+.ld-grid b{font-weight:inherit;animation:ld-pop 4.5s ease-in-out infinite both}
+.ld-grid i:first-child{border-top-left-radius:7px}.ld-grid i:nth-child(3){border-top-right-radius:7px}
+.ld-grid i:nth-child(7){border-bottom-left-radius:7px}.ld-grid i:last-child{border-bottom-right-radius:7px}
+.ld-grid i:nth-child(2) b{animation-delay:.25s}.ld-grid i:nth-child(3) b{animation-delay:.5s}.ld-grid i:nth-child(4) b{animation-delay:.75s}
+.ld-grid i:nth-child(5) b{animation-delay:1s}.ld-grid i:nth-child(6) b{animation-delay:1.25s}.ld-grid i:nth-child(7) b{animation-delay:1.5s}
+.ld-grid i:nth-child(8) b{animation-delay:1.75s}.ld-grid i:nth-child(9) b{animation-delay:2s}
+@keyframes ld-pop{0%,4%{opacity:0;transform:scale(.4)}12%,80%{opacity:1;transform:scale(1)}92%,100%{opacity:0;transform:scale(.8)}}
+.ld-brand{margin:0;font:900 30px/1 var(--f-display);letter-spacing:-.015em}
+.ld-brand .wm-play{color:var(--brand-blue)}
+.ld-k{margin:14px 0 0;font:500 11px var(--f-mono);text-transform:uppercase;letter-spacing:.12em;color:var(--brand-blue)}
+.ld-fact{margin:0;max-width:440px;min-height:4.5em;color:var(--muted);font-size:15px;transition:opacity .3s ease}
+.ld-fact.swap{opacity:0}
+@media (prefers-reduced-motion:reduce){.ld-grid b{animation:none}}
+
+/* account button and panel (js/account.js) */
+.tog.acct.in{border-color:var(--brand-blue);color:var(--brand-blue)}
+.acct-pic{width:20px;height:20px;border-radius:50%;margin:-2px 0;object-fit:cover}
+.tog.acct .tlabel{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:1px solid #747775;color:#1f1f1f}
+.g-logo{width:20px;height:20px;flex:none}
+.acct-stats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.acct-stats li{display:flex;flex-direction:column;background:var(--surface-2);border-radius:10px;padding:10px 12px}
+.acct-stats span{color:var(--muted);font-size:14px}

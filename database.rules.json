@@ -95,6 +95,47 @@
           ".validate": false
         }
       }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "since": {
+          ".validate": "newData.isNumber() && (data.exists() ? newData.val() === data.val() : newData.val() === now)"
+        },
+        "seen": {
+          ".validate": "newData.val() === now"
+        },
+        "stats": {
+          "$game": {
+            ".validate": "$game.matches(/^[a-z0-9]{1,20}$/)",
+            "played": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "wins": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "losses": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "draws": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "last": {
+              ".validate": "newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }

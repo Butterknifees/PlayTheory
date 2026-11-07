@@ -33,8 +33,10 @@ const Online=(()=>{
         firebase.initializeApp(FIREBASE_CONFIG);
         if(appCheck) firebase.appCheck().activate(appCheck,true); // proves requests come from this site, not a script
       }
-      const cred=await firebase.auth().signInAnonymously();
-      uid=cred.user.uid;db=firebase.database();
+      /* a saved Google sign-in (js/account.js) comes back on its own; only sign in anonymously without one */
+      const auth=firebase.auth(),saved=auth.currentUser||await new Promise(ok=>{const off=auth.onAuthStateChanged(u=>{off();ok(u)})});
+      uid=(saved||(await auth.signInAnonymously()).user).uid;db=firebase.database();
+      auth.onAuthStateChanged(u=>{if(u)uid=u.uid});
       db.ref('.info/serverTimeOffset').on('value',s=>{offset=s.val()||0});
     })();
     sdkP.catch(()=>{sdkP=null});
@@ -298,5 +300,5 @@ const Online=(()=>{
       open();run('Joining the challenge…',()=>accept(m).then(close));
     }
   }
-  return {init,open,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get friend(){return friendJoined()},get me(){return st.me},get offset(){return offset}};
+  return {init,open,connect,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get friend(){return friendJoined()},get me(){return st.me},get offset(){return offset}};
 })();
