@@ -705,10 +705,14 @@ function sdkWorth(grid){
   return left.map((x,d)=>d&&x?ranks.indexOf(x)+1:0);
 }
 const sdkValue=(s,d)=>s.scoring==='diff'?sdkWorth(s.grid)[d]:d;
+/* rapid fire (and the daily challenge): after a wrong number that player scores nothing for 15 seconds;
+   s.cold[p] is when the points come back (server time). Take turns has no such pause. */
+const SDK_COLD=15000,sdkCold=(s,p)=>Math.max(0,((s.cold||[])[p]||0)-sdkNow());
 function sdkPlace(s,i,d,spent,p=s.turn){
-  const n=clone(s),ok=s.sol[i]===d,pts=ok?sdkValue(s,d)*s.boost[i]:-1;
+  const n=clone(s),ok=s.sol[i]===d,cold=ok&&sdkCold(s,p)>0,pts=ok?cold?0:sdkValue(s,d)*s.boost[i]:-1;
   if(ok){n.grid[i]=d;n.own[i]=p}
-  n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n};
+  else if(s.mode!=='turns') (n.cold||(n.cold=[0,0]))[p]=sdkNow()+SDK_COLD;
+  n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n,...(cold?{cold:1}:{})};
   if(s.mode==='daily'){if(!ok)n.wrong++;else if(!n.grid.includes(0))n.fin=sdkNow();return n} // the clock stops on the last square
   if(s.mode==='rapid'){if(!n.deadline&&n.limit)n.deadline=sdkNow()+n.limit;return n}
   if(n.limit&&spent) n.clock[p]=Math.max(0,n.clock[p]-spent);
@@ -723,12 +727,24 @@ const sdkClock={key:'',t:0,timeout:null},sdkFx={key:''};
 const sdkSpent=s=>s.mode==='turns'&&sdkCount(s)>0&&sdkClock.key?Date.now()-sdkClock.t:0;
 const sdkOnline=()=>typeof Online!=='undefined'&&Online.on;
 /* the little +points or −1 that pops out of a square, for your moves and your friend's */
-function sdkEffect(l,daily){
+function sdkEffect(l,s){
+  const daily=s.mode==='daily';
   if(!l||l.i==null){if(l&&(l.skip!=null||l.timeout!=null))Sound.fx('bell');return}
   const cell=document.querySelector(`#board .sc[data-i="${l.i}"]`);if(!cell)return;
-  cell.append(el('span',{class:'sdk-float'+(l.ok?' f'+l.p:' bad')},l.ok?'+'+l.pts:daily?'−1 · +10 s':'−1'));
+  cell.append(el('span',{class:'sdk-float'+(l.ok?' f'+l.p:' bad')+(l.cold?' cold':'')},l.ok?'+'+l.pts:daily?'−1 · +10 s':'−1'));
+  if(!l.ok){cell.append(el('span',{class:'sdk-wrongd'},String(l.d)));if(s.mode!=='turns'&&(!sdkOnline()||l.p!==Online.me))sdkToast(l)}
   if(l.ok){Sound.fx(l.pts>l.d?'coin':'pop',{p:l.p});FX.burstAt(cell,[FX.color(PC[l.p]),'#ffd27a','#ffffff'],l.pts>l.d?34:16,{speed:l.pts>l.d?190:120})}
   else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p:l.p});setTimeout(()=>cell.classList.remove('bad'),600)}
+}
+
+/* a wrong number pops up for the other player: who, which number, where, and the 15 seconds without points */
+function sdkToast(l){
+  document.querySelectorAll('.sdk-toast').forEach(e=>e.remove());
+  const t=el('div',{class:'sdk-toast t'+l.p,role:'status','aria-live':'polite'},
+    el('b',{},`${name(l.p)} played a wrong ${l.d}`),
+    el('span',{},`Row ${(l.i/9|0)+1}, column ${l.i%9+1}. That’s −1 point, and no points for ${name(l.p)} for the next 15 seconds.`));
+  t.addEventListener('click',()=>t.remove());
+  document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),400)},3200);
 }
 
 /* the daily challenge set-up: choose who you're playing first, on this screen or on another device, then start the clock */
@@ -762,11 +778,11 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
   blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>s&&s.mode==='daily'?['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     'Daily challenge: everyone gets the same puzzle and the same bonus squares each day, and a new one comes at midnight IST. Play it with a friend on one screen or on two devices.',
-    'It plays like rapid fire with no game clock: both of you place numbers at once until the board is full. Scoring is by difficulty, ×2 and ×3 squares multiply, and a wrong number costs the player who placed it 1 point.',
+    'It plays like rapid fire with no game clock: both of you place numbers at once until the board is full. Scoring is by difficulty, ×2 and ×3 squares multiply, a wrong number costs the player who placed it 1 point, and for the next 15 seconds that player scores nothing for the squares they fill.',
     'The clock starts when you tap Start the clock and stops when the last square is filled. Every wrong number, by either of you, adds 10 seconds to your pair’s time on the daily leaderboard. Only your first finished game each day counts; play again for practice.']:['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     !s||s.scoring==='diff'
-      ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. You can also choose number value scoring, where a correct number scores its own value.'
-      :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
+      ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for the next 15 seconds. You can also choose number value scoring, where a correct number scores its own value.'
+      :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for the next 15 seconds. You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
     'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the game clock ends (3, 5 or 10 minutes; 10 is the default).',
     'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.'],
   win:s=>s&&s.mode==='daily'?'When the board is full, the higher score wins, and the fastest pairs of the day top the leaderboard.':'When the board is full or time is up, the higher score wins. A tie is possible.',
@@ -800,7 +816,7 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
       sdkClock.timeout=daily?null:rapid
         ?()=>ctx.play({...clone(s),ended:1},null,{silent:true,op:st=>st.ended?null:{...st,ended:1}})
         :()=>{const spent=Date.now()-sdkClock.t,out=s.limit&&s.clock[p]-spent<=0;ctx.play(out?sdkTimeout(s):sdkSkip(s,spent),null,{silent:true})};
-      if(s.last){const k=JSON.stringify(s.last);if(k!==sdkFx.key){const seen=sdkFx.key!=='';sdkFx.key=k;if(seen)setTimeout(()=>sdkEffect(s.last,daily),0)}}
+      if(s.last){const k=JSON.stringify(s.last);if(k!==sdkFx.key){const seen=sdkFx.key!=='';sdkFx.key=k;if(seen)setTimeout(()=>sdkEffect(s.last,s),0)}}
       else sdkFx.key='-';
     }
     const wrap=el('div',{class:'sdk'+(rapid?' rapid':'')});
@@ -832,7 +848,7 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
 
     /* scores and clocks */
     const pill=q=>el('div',{class:'sdk-score s'+q+(!rapid&&p===q&&!s.out[q]?' on':'')+(s.out[q]?' out':'')},
-      el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),el('b',{},String(s.score[q])),
+      el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&sdkCold(s,q)>0?el('span',{class:'sdk-cold','data-cold':q},`No points ${Math.ceil(sdkCold(s,q)/1000)}s`):null,app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),el('b',{},String(s.score[q])),
       !rapid&&s.limit?el('span',{class:'sdk-clock','data-p':q},s.out[q]?'Time’s up':sdkFmt(s.clock[q]-(app&&started&&q===p?Date.now()-sdkClock.t:0))):null);
     wrap.append(el('div',{class:'sdk-scores'},pill(0),pill(1)));
     if(daily) wrap.append(el('div',{class:'sdk-drow'},el('div',{class:'sdk-gclock sdk-dclock'},sdkUp(sdkTook(s))),
@@ -916,6 +932,7 @@ if(typeof document!=='undefined'){
   setInterval(()=>{
     if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||S.over||S.busy) return;
     const s=S.state,fire=()=>{const t=sdkClock.timeout;sdkClock.timeout=null;if(t)t()};
+    document.querySelectorAll('#board .sdk-cold').forEach(e=>{const left=sdkCold(s,+e.dataset.cold);e.textContent=`No points ${Math.ceil(left/1000)}s`;e.hidden=left<=0});
     if(s.mode==='daily'){if(s.t0&&!s.fin)document.querySelectorAll('#board .sdk-dclock').forEach(e=>{e.textContent=sdkUp(sdkTook(s))});return}
     if(s.mode==='rapid'){
       if(!s.deadline||s.ended) return;
