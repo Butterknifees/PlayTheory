@@ -46,6 +46,20 @@
             ".validate": "newData.isBoolean() && (newData.val() === data.val() || ($side === 'L' && newData.parent().parent().child('host').val() === auth.uid) || ($side === 'R' && newData.parent().parent().child('guest').val() === auth.uid))"
           }
         },
+        "elo": {
+          "$side": {
+            ".validate": "newData.hasChildren(['rapid', 'turns']) && ((newData.child('rapid').val() === data.child('rapid').val() && newData.child('turns').val() === data.child('turns').val()) || (($side === 'L' && newData.parent().parent().child('host').val() === auth.uid) || ($side === 'R' && newData.parent().parent().child('guest').val() === auth.uid)))",
+            "rapid": {
+              ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
+            },
+            "turns": {
+              ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
         "$other": {
           ".validate": false
         }
@@ -93,6 +107,112 @@
         },
         "$other": {
           ".validate": false
+        }
+      }
+    },
+    "daily": {
+      "$day": {
+        ".read": "auth != null && $day.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        ".indexOn": [
+          "total"
+        ],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && !data.exists() && newData.exists()",
+          ".validate": "$day.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/) && newData.hasChildren(['a', 'b', 'sa', 'sb', 'ms', 'wrong', 'total', 'at'])",
+          "a": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+          },
+          "b": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+          },
+          "sa": {
+            ".validate": "newData.isNumber() && newData.val() >= -1000 && newData.val() <= 10000"
+          },
+          "sb": {
+            ".validate": "newData.isNumber() && newData.val() >= -1000 && newData.val() <= 10000"
+          },
+          "ms": {
+            ".validate": "newData.isNumber() && newData.val() >= 30000 && newData.val() <= 86400000"
+          },
+          "wrong": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000 && newData.val() % 1 === 0"
+          },
+          "total": {
+            ".validate": "newData.isNumber() && newData.val() === newData.parent().child('ms').val() + newData.parent().child('wrong').val() * 10000"
+          },
+          "at": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "ratings": {
+      "$pool": {
+        ".read": "auth != null && ($pool === 'rapid' || $pool === 'turns')",
+        ".indexOn": [
+          "r"
+        ],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.exists()",
+          ".validate": "($pool === 'rapid' || $pool === 'turns') && newData.hasChildren(['r', 'n', 'w', 'l', 'd', 'name', 'opp', 'm', 'g', 'at']) && (!data.exists() || data.child('at').val() < now - 30000) && newData.child('w').val() + newData.child('l').val() + newData.child('d').val() === newData.child('n').val() && !root.child('rated').child(newData.child('m').val()).child(newData.child('g').val()).child($uid).exists() && newData.parent().parent().parent().child('rated').child(newData.child('m').val()).child(newData.child('g').val()).child($uid).exists()",
+          "r": {
+            ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000 && (data.exists() ? (newData.val() - data.val() <= 40 && data.val() - newData.val() <= 40) : (newData.val() - 1200 <= 40 && 1200 - newData.val() <= 40))"
+          },
+          "n": {
+            ".validate": "newData.val() === (data.exists() ? data.val() + 1 : 1)"
+          },
+          "w": {
+            ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1"
+          },
+          "l": {
+            ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1"
+          },
+          "d": {
+            ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+          },
+          "m": {
+            ".validate": "newData.isString() && newData.val().matches(/^[a-z0-9]{12}$/) && root.child('matches').child(newData.val()).child('guest').exists() && (root.child('matches').child(newData.val()).child('host').val() === auth.uid || root.child('matches').child(newData.val()).child('guest').val() === auth.uid)"
+          },
+          "opp": {
+            ".validate": "newData.isString() && newData.val() !== auth.uid && root.child('users').child(newData.val()).exists() && (root.child('matches').child(newData.parent().child('m').val()).child('host').val() === newData.val() || root.child('matches').child(newData.parent().child('m').val()).child('guest').val() === newData.val())"
+          },
+          "g": {
+            ".validate": "newData.isString() && newData.val().matches(/^[a-z0-9]{6,12}$/)"
+          },
+          "at": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "rated": {
+      "$m": {
+        "$g": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+            ".validate": "$m.matches(/^[a-z0-9]{12}$/) && $g.matches(/^[a-z0-9]{6,12}$/) && newData.hasChildren(['r0', 'r1', 'at'])",
+            "r0": {
+              ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
+            },
+            "r1": {
+              ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
+            },
+            "at": {
+              ".validate": "newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
         }
       }
     },

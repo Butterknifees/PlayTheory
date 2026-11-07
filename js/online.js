@@ -97,6 +97,7 @@ const Online=(()=>{
     ref.on('value',s=>receive(s.val()));
     setURL(m);document.body.classList.add('online');
     names();bar();if(!S.busy) renderPlay();
+    if(typeof Rating!=='undefined') Rating.publish(); // a signed-in player's ratings, for a rated game
   }
   /* the host ending a match frees its room code; the match itself is kept (games are saved for a bot to learn from) */
   function end(){
@@ -300,5 +301,5 @@ const Online=(()=>{
       open();run('Joining the challenge…',()=>accept(m).then(close));
     }
   }
-  return {init,open,connect,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get friend(){return friendJoined()},get me(){return st.me},get offset(){return offset}};
+  return {init,open,connect,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get friend(){return friendJoined()},get me(){return st.me},get offset(){return offset},get id(){return id},get match(){return match}};
 })();

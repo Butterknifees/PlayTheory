@@ -6,7 +6,7 @@
    If this device already played online anonymously, signing in links Google to that same account. */
 const Account=(()=>{
   const KEY='pt-account'; // {n: name}: lets the name prompt greet a signed-in player before Firebase has loaded
-  let user=null,profile=null,ready=false,err='',busyMsg='',then=null,rec=null,watching=false,loadP=null;
+  let user=null,profile=null,ready=false,err='',busyMsg='',then=null,rec=null,watching=false,loadP=null,pitch=null;
   const saved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
   const remember=v=>{try{if(v)localStorage.setItem(KEY,JSON.stringify(v));else localStorage.removeItem(KEY)}catch(e){}};
   const signedIn=()=>!!(user&&!user.isAnonymous);
@@ -33,6 +33,7 @@ const Account=(()=>{
         else{profile=p;uref('seen').set(T()).catch(()=>{})}
         remember({n:profile.name||first(u.displayName)});
       }catch(e){console.warn('Could not load the profile.',e);profile=profile||{name:first(u.displayName)}}
+      if(typeof Rating!=='undefined') Rating.publish(); // signed in during an online match: the game can be rated from the next one
       draw();
     })();
     loadP.uid=u.uid;return loadP;
@@ -42,18 +43,23 @@ const Account=(()=>{
   const WHY={'auth/popup-blocked':'Your browser blocked the sign-in window. Allow pop-ups for this site and try again.',
     'auth/operation-not-allowed':'Google sign-in isn’t switched on for PlayTheory yet.',
     'auth/unauthorized-domain':'Google sign-in doesn’t work on this web address yet.',
-    'auth/network-request-failed':'Could not reach Google. Check your connection and try again.'};
+    'auth/network-request-failed':'Could not reach Google. Check your connection and try again.',
+    'pt/in-match':'That Google account already has a PlayTheory profile. End your online match, then sign in.'};
   async function signIn(){
-    if(Online.on){err='Finish your online match first, then sign in.';panel();return}
     const auth=firebase.auth(),gp=new firebase.auth.GoogleAuthProvider();
     err='';busyMsg='Waiting for Google…';panel();
     try{
       const cur=auth.currentUser;
       /* keep this device's anonymous id (and its matches) when the Google account is new here */
+      /* linking keeps the same uid, so it's fine mid-match; switching to an existing account isn't (the match knows the old uid) */
       if(cur&&cur.isAnonymous){
         try{await cur.linkWithPopup(gp)}
-        catch(e){if(e.code==='auth/credential-already-in-use'&&e.credential)await auth.signInWithCredential(e.credential);else throw e}
-      }else await auth.signInWithPopup(gp);
+        catch(e){
+          if(e.code==='auth/credential-already-in-use'&&e.credential&&Online.on) throw {code:'pt/in-match'};
+          if(e.code==='auth/credential-already-in-use'&&e.credential)await auth.signInWithCredential(e.credential);else throw e;
+        }
+      }else if(Online.on) throw {code:'pt/in-match'};
+      else await auth.signInWithPopup(gp);
       busyMsg='';const f=then;then=null;
       const u=auth.currentUser;if(u){user=u;await load()}
       close();if(f)f(profile&&profile.name||first(u&&u.displayName));
@@ -109,26 +115,28 @@ const Account=(()=>{
     }else if(!signedIn()){
       const go=el('button',{class:'btn big g-btn',type:'button',autofocus:''},gLogo(),'Sign in with Google');
       go.addEventListener('click',signIn);
-      kids.push(el('h2',{},'Save your games'),
-        el('p',{},'Sign in to keep your player name and your wins, losses and draws, on any device.'),go,
+      kids.push(el('h2',{},pitch?pitch.title:'Save your games'),
+        el('p',{},pitch?pitch.text:'Sign in to keep your player name, your wins and losses, and a chess-style rating, on any device.'),go,
         el('p',{class:'fine'},'We save the name you play under and your game results. Your Google password never reaches PlayTheory. Signing in is optional: you can always play without it.'));
     }else{
       const p=profile||{},stats=Object.entries(p.stats||{}).filter(([g])=>GAMES.some(x=>x.id===g));
       const out=el('button',{class:'btn',type:'button'},'Sign out');out.addEventListener('click',signOut);
+      const rk=el('button',{class:'btn',type:'button'},'Player rankings');rk.addEventListener('click',()=>{close();Rating.open()});
       kids.push(el('h2',{},`Hi, ${p.name||first(user.displayName)||'there'}`),
-        el('p',{class:'fine'},`Signed in with Google${user.email?' as '+user.email:''}.`),
+        el('p',{class:'fine'},`Signed in with Google${user.email?' as '+user.email:''}.`),Rating.summary(),
         stats.length?el('ul',{class:'acct-stats'},...stats.map(([g,s])=>el('li',{},el('b',{},GAMES.find(x=>x.id===g).name),
           el('span',{},`${s.played||0} played · ${s.wins||0} won · ${s.losses||0} lost · ${s.draws||0} drawn`))))
           :el('p',{},'No games saved yet. Finish a game and your result shows up here.'),
-        el('div',{class:'row'},out));
+        el('div',{class:'row'},rk,out));
     }
     if(err) kids.push(el('p',{class:'net-err',role:'alert'},err));
     const x=el('button',{class:'dlg-x',type:'button','aria-label':'Close'},'×');x.addEventListener('click',close);
     box.replaceChildren(x,...kids.filter(Boolean));
   }
-  /* f(name) runs after a successful sign-in from this opening (the name prompt uses it to fill the name) */
-  function open(f){
-    then=typeof f==='function'?f:null;err='';
+  /* f(name) runs after a successful sign-in from this opening (the name prompt uses it to fill the name);
+     why = {title, text} says what signing in is for this time (a rating, the daily leaderboard) */
+  function open(f,why){
+    then=typeof f==='function'?f:null;pitch=why||null;err='';
     if(!ready) start().then(panel).catch(e=>{err=e.message||String(e);panel()});
     panel();const d=$('accountDlg');
     if(!d.open){try{d.showModal()}catch(e){d.setAttribute('open','')}}
@@ -138,9 +146,9 @@ const Account=(()=>{
   function init(){
     $('accountBtn').addEventListener('click',()=>open());
     $('accountDlg').addEventListener('click',e=>{if(e.target===$('accountDlg'))close()});
-    $('accountDlg').addEventListener('close',()=>{err='';then=null});
+    $('accountDlg').addEventListener('close',()=>{err='';then=null;pitch=null});
     draw();
     if(saved()) start().catch(()=>{}); // signed in last time: restore it in the background
   }
-  return {init,open,result,setName,savedName,get signedIn(){return signedIn()}};
+  return {init,open,result,setName,savedName,get signedIn(){return signedIn()},get name(){return (profile&&profile.name)||S.me||''}};
 })();

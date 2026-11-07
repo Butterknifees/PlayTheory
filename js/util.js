@@ -3,8 +3,10 @@
 const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 const clone=o=>JSON.parse(JSON.stringify(o));
-const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const shuffle=(a,rnd=Math.random)=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const sum=a=>a.reduce((x,y)=>x+y,0);
+/* the same run of numbers from the same seed, on any device (the daily puzzle uses it) */
+const seeded=seed=>{let t=seed>>>0;return()=>{t=t+0x6D2B79F5>>>0;let r=Math.imul(t^t>>>15,1|t);r=r+Math.imul(r^r>>>7,61|r)^r;return((r^r>>>14)>>>0)/4294967296}};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const PC=['L','R'];
 const CNAME={L:'blue',R:'black',N:'green'};

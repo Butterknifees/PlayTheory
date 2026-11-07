@@ -42,6 +42,8 @@ const ctx={
 function celebrate(){
   const w=S.over.winner;
   Account.result(S.over); // saved for a signed-in player
+  if(S.over.daily) Daily.done(S.state,S.over); // the pair's time goes on today's leaderboard
+  Rating.result(S.state,S.over); // online between two signed-in players: new ratings
   if(w==='draw'){Sound.fx('draw');return}
   Sound.fx('win',{id:S.gid});
   Mascot.cheer(name(w));
@@ -56,7 +58,7 @@ function renderInfo(){
   $('gBlurb').textContent=g.blurb;
   const rules=typeof g.rules==='function'?g.rules(S.state):g.rules;
   $('gRules').replaceChildren(...rules.map(t=>el('li',{},pn(t))));
-  $('gWin').textContent=pn(g.win)||'If it is your turn and you have no legal move, you lose.';
+  $('gWin').textContent=pn(typeof g.win==='function'?g.win(S.state):g.win)||'If it is your turn and you have no legal move, you lose.';
   $('gameSel').value=g.id;
 }
 
@@ -93,7 +95,9 @@ function renderPlay(moved){
     const w=over.winner;res.hidden=false;res.className='result'+(w==='draw'?'':' w'+w);
     const again=el('button',{class:'btn',type:'button'},'Play again');again.addEventListener('click',()=>newPosition(true));
     const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Choose another game');nxt.addEventListener('click',goHome);
-    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},pn(over.reason))),el('div',{class:'row'},again,nxt));
+    const lb=over.daily?el('button',{class:'btn',type:'button'},'Leaderboard'):null;if(lb)lb.addEventListener('click',()=>Daily.open(s.day));
+    if(over.daily) again.textContent='Play again (practice)';
+    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},pn(over.reason)),Rating.line(s)),el('div',{class:'row'},lb,again,nxt));
   }else res.hidden=true;
   S.hint=null;
   const board=$('board');
@@ -154,14 +158,15 @@ function updateNowPlaying(){
   $('lookBtn').setAttribute('aria-pressed',String(Skins.on));
 }
 
-function newPosition(animate,dealt){
+/* seed: a state hinting which kind of game to deal (the daily challenge passes {mode:'daily'}); a new position keeps the kind */
+function newPosition(animate,dealt,seed){
   Mascot.hide();
-  S.state=S.game.create();S.state.turn=S.starter;S.hist=[];S.who=[];S.ui={};S.busy=false;
+  S.state=S.game.create(dealt?seed:S.state);S.state.turn=S.starter;S.hist=[];S.who=[];S.ui={};S.busy=false;
   renderInfo();S.entering=!!animate;renderPlay();
   Demo.start(S.game,$('demoBox'),$('demoCap'));
   if(!dealt) Online.push('new');
 }
-function startGame(id){if(!playable(id)){goHome();return}closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false,true);showIntro();Online.push('game')}
+function startGame(id,seed){if(!playable(id)){goHome();return}closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false,true,seed);showIntro();Online.push('game')}
 function nextRandom(){
   if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>playable(id)&&id!==S.gid));
   if(!S.bag.length) S.bag=[FEATURED];
@@ -189,11 +194,12 @@ function setRoute(id){
 function goHome(){
   Mascot.hide();closeSheet();Demo.stop();Music.stop();
   const intro=$('intro');intro.hidden=true;intro.classList.remove('playing');
-  view('home');setRoute(null);updateNowPlaying();
+  view('home');setRoute(null);updateNowPlaying();Daily.card();
   try{window.scrollTo({top:0})}catch(e){}
   requestAnimationFrame(()=>document.querySelectorAll('.gprev.drawn').forEach(fitPreview));
 }
 function route(){
+  if(location.hash==='#/daily'){startGame(FEATURED,{mode:'daily'});return} // a link straight to today's puzzle
   const m=location.hash.match(/^#\/play\/([a-z0-9]+)/),id=m&&GAMES.some(g=>g.id===m[1])&&playable(m[1])?m[1]:null;
   if(!id){if(document.body.dataset.view!=='home'||m)goHome();return}
   if(id===S.gid&&S.state){view('play');return}
@@ -372,7 +378,7 @@ function boot(){
   document.addEventListener('click',tapToConfirm,true);
   let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{fitBox($('board'));fitBox($('demoBox'));document.querySelectorAll('.gprev.drawn').forEach(fitPreview);if(!narrow())closeSheet()},120)});
   updateNowPlaying();
-  buildHome();
+  buildHome();Daily.init();Rating.init();
   addEventListener('hashchange',route);addEventListener('popstate',route);
   /* switching tab or app, or locking the phone, silences everything; coming back picks the music up again */
   const away=()=>{Music.stop();const ac=Sound.ac;if(ac&&ac.state==='running')ac.suspend().catch(()=>{});updateNowPlaying()};
