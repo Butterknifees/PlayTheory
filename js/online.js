@@ -150,6 +150,7 @@ const Online=(()=>{
   function receive(r){
     if(!st.on) return;
     if(!r){leave('The challenge was closed.');return}
+    const arrived=st.me===0&&!!r.guest&&!(match&&match.guest);
     match=r;
     const nm=(r.names||{})[PC[other()]]||'',mine=(r.names||{})[PC[st.me]]||'';
     let renamed=false;
@@ -160,6 +161,8 @@ const Online=(()=>{
       if(r.tok!==lastTok||r.snap!==lastData||fresh) apply(r); // our own write echoing back unchanged needs no replay
     }else if(renamed){renderInfo();if(!S.busy)renderPlay()}
     names();bar();
+    /* your friend just joined: put the link away and go to the board, where the game is set up */
+    if(arrived){close();const box=$('intro');if(document.body.dataset.view==='play'&&!box.hidden&&!box.classList.contains('out'))enterGame()}
   }
   function apply(r){
     let d;try{d=JSON.parse(r.snap)}catch(e){return}
