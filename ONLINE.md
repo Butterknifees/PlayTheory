@@ -1,6 +1,6 @@
 # Turning on online play
 
-**Play online** lets two people play the same game on two devices. One player taps **Challenge a friend** and sends the link, or taps **Make a room** and tells their friend the 5-letter code. The friend opens the link, or taps **Play online → Join a room** and types the code, and plays black on their own device. Moves, undo, new positions, new games and names all sync live.
+**Play a friend online** (the first choice when you open DuSoKu) lets two people play the same game on two devices. One player taps **Challenge a friend** and sends the link, or taps **Make a room** and tells their friend the 5-letter code. The friend opens the link, or taps **Play online → Join a room** and types the code, and plays black on their own device. Moves, undo, new positions, new games and names all sync live.
 
 Online play needs a free Firebase project. You set it up once and it takes about ten minutes. Until it's set up, the site still works as a one-screen game and the online button explains that online play isn't switched on.
 

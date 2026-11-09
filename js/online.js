@@ -261,7 +261,7 @@ const Online=(()=>{
           el('div',{class:'net-opts'},
             el('div',{class:'net-opt'},go,el('p',{class:'fine'},'Get a link to send them.')),
             el('div',{class:'net-opt'},room,el('p',{class:'fine'},'Get a short code to tell them.'))));
-      }else kids.push(el('p',{},'To start a match, pick a game first, then tap Play online.'));
+      }else kids.push(el('p',{},'To start a match, open a game and choose Play a friend online.'));
       const inp=el('input',{class:'code-in',maxlength:'5',placeholder:'K7Q2M',autocomplete:'off',autocapitalize:'characters',spellcheck:'false','aria-label':'Room code',value:codeDraft});
       inp.addEventListener('input',()=>{codeDraft=inp.value});
       const join=el('button',{class:'btn'+(inGame?'':' primary'),type:'button'},'Join');
@@ -280,7 +280,7 @@ const Online=(()=>{
       const room=mode==='room'&&code&&!friendJoined();
       kids.push(el('h2',{},friendJoined()?`Playing ${name(other())}`:room?'Your room':'Your challenge link'),
         friendJoined()?el('p',{},`You play ${CNAME[PC[st.me]]} on this device. ${friendHere()?name(other())+' is connected.':name(other())+' is away right now; moves will show up when they are back.'}`)
-          :room?el('p',{},'Tell your friend this code. They open PlayTheory, tap Play online, and type it under Join a room.')
+          :room?el('p',{},'Tell your friend this code. They open DuSoKu on PlayTheory, tap Join a room, and type it in.')
           :el('p',{},'Send this link to your friend. The game starts as soon as they open it.'),
         ...(room?[codeBox,el('p',{class:'fine'},'Or send them the link instead:'),inp,el('div',{class:'row'},share,back)]
           :[inp,el('div',{class:'row'},share,back),code&&!friendJoined()?el('p',{class:'fine'},'Or tell them the room code: ',el('b',{class:'mono'},code)):null]),
@@ -311,5 +311,5 @@ const Online=(()=>{
       open();run('Joining the challenge…',()=>accept(m).then(close));
     }
   }
-  return {init,open,connect,push,setName,mayMove,mayUndo,leave,st,get on(){return st.on},get friend(){return friendJoined()},get me(){return st.me},get offset(){return offset},get id(){return id},get match(){return match}};
+  return {init,open,connect,push,setName,mayMove,mayUndo,leave,end,st,get on(){return st.on},get friend(){return friendJoined()},get me(){return st.me},get offset(){return offset},get id(){return id},get match(){return match}};
 })();

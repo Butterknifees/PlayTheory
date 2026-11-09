@@ -961,3 +961,19 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
   .rv-dlg .dlg-body{padding:16px 12px}
 }
 @media (max-width:420px){.rv-cards{grid-template-columns:1fr}.rv-acc b{font-size:22px}}
+
+/* DuSoKu's first screen: who are you playing? (sdkChooser in js/games.js), cards like a chess site's Play page */
+.sdk-choose{display:flex;flex-direction:column;gap:10px;width:min(520px,100%);padding:18px;border-radius:16px;background:var(--surface);box-shadow:0 10px 30px rgba(20,26,36,.12)}
+.sdk-choose h3{margin:0 0 4px;font:900 24px var(--f-display);letter-spacing:-.02em;text-align:center}
+.sdk-pick{display:flex;align-items:center;gap:16px;width:100%;padding:14px 16px;border-radius:14px;border:2px solid var(--line);background:var(--surface);text-align:left;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
+.sdk-pick:not(:disabled):hover{border-color:var(--brand-blue);transform:translateY(-1px);box-shadow:0 6px 16px rgba(60,127,188,.15)}
+.sdk-pick .ic{width:52px;height:52px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--left-soft);color:var(--brand-blue)}
+.sdk-pick .ic svg{width:28px;height:28px}
+.sdk-pick.pk-bot .ic{background:var(--surface-2);overflow:hidden} .sdk-pick.pk-bot .mascot-sprite{width:52px}
+.sdk-pick.pk-here .ic{background:#e2e3e5;color:var(--ink)}
+.sdk-pick.pk-daily .ic{background:#fbf1d4;color:#a86f00}
+.sdk-pick .tx{display:flex;flex-direction:column;min-width:0}
+.sdk-pick b{font:900 19px var(--f-display);letter-spacing:-.01em}
+.sdk-pick small{color:var(--muted);font-size:14px;line-height:1.35}
+.sdk-join{text-align:center;margin:2px 0 0}
+.sdk-vs{font-weight:700}

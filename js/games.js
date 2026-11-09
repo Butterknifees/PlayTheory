@@ -686,7 +686,7 @@ const SDK_GAME=12*60000;
 const sdkNow=()=>Date.now()+(typeof Online!=='undefined'?Online.offset:0);
 const sdkCount=s=>s.n+s.out[0]+s.out[1]+(s.skips||0);
 /* the daily challenge: one puzzle a day (boosters too), the same for everyone, made from the date in India so it changes
-   at midnight IST. It plays like rapid fire with no game clock: race to fill the board, the higher score wins, and the
+   at midnight IST. It plays like rapid fire (stopping after an hour): race to fill the board, the higher score wins, and the
    pair's time plus 10 seconds for every wrong number goes on the leaderboard (js/daily.js) */
 const IST=19800000,DAY=86400000,SDK_PEN=10000;
 const sdkDay=(t=sdkNow())=>new Date(t+IST).toISOString().slice(0,10);
@@ -697,7 +697,8 @@ const sdkGameId=()=>Math.random().toString(36).slice(2,10).padEnd(8,'0');
 const sdkElo=s=>typeof Rating!=='undefined'?Rating.snap(s):null;
 const sdkDaily=(day=sdkDay())=>({g:sdkGameId(),...sdkBoard('medium',seeded([...day].reduce((h,c)=>Math.imul(h^c.charCodeAt(0),16777619),2166136261))),
   score:[0,0],n:0,last:null,set:0,mode:'daily',day,scoring:'diff',turnLimit:0,limit:0,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0,wrong:0,t0:0,fin:0});
-const sdkTook=s=>s.t0?(s.fin||sdkNow())-s.t0:0;
+/* the daily stops after an hour (owner, 2026-11-09); a board not finished by then is scored but not on the leaderboard */
+const SDK_DAILY_MAX=3600000,sdkTook=s=>s.t0?Math.min(SDK_DAILY_MAX,(s.fin||sdkNow())-s.t0):0;
 const sdkUp=ms=>sdkFmt(Math.floor(Math.max(0,ms)/1000)*1000);
 /* by-difficulty scoring: the more copies of a number still to place, the more it is worth.
    Numbers are ranked by how many are left, ties share a rank, and rank 1 is worth 1 point. */
@@ -754,6 +755,22 @@ function sdkToast(l){
 }
 
 /* the daily challenge set-up: choose who you're playing first, on this screen or on another device, then start the clock */
+/* the first screen, like a chess site's Play page: who are you playing? Then the settings (render) */
+function sdkChooser(s,ctx,wrap){
+  const I=(...d)=>sv('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},...d.map(x=>sv('path',{d:x})));
+  const card=(cls,icon,title,sub,f)=>{const b=el('button',{class:'sdk-pick '+cls,type:'button'},el('span',{class:'ic'},icon),el('span',{class:'tx'},el('b',{},title),el('small',{},sub)));
+    b.disabled=!ctx.live;b.addEventListener('click',f);return b};
+  const knight=typeof Mascot!=='undefined'?Mascot.pose(false):I('M12 3v18');
+  const join=el('button',{class:'linkish',type:'button'},'Join a room');join.addEventListener('click',()=>Online.open());
+  wrap.append(el('div',{class:'sdk-choose'},el('h3',{},'How do you want to play?'),
+    card('pk-online',I('M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7','M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'),'Play a friend online','Send a link or a room code. They play on their own phone or computer.',()=>Online.open()),
+    card('pk-bot',knight,'Play the computer','Play the knight. It plays like a person, not a machine.',()=>ctx.configure({...clone(s),vs:'bot',bot:1})),
+    card('pk-here',I('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2','M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8','M22 21v-2a4 4 0 0 0-3-3.9','M16 3.1a4 4 0 0 1 0 7.8'),'Play a friend here','Two players on this screen, each with their own number pad.',()=>ctx.configure({...clone(s),vs:'here',bot:0})),
+    card('pk-daily',I('M8 2v4','M16 2v4','M3 10h18','M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'),'Today’s daily challenge',`Everyone gets the same puzzle today (${sdkDayName(sdkDay())}). Race a friend for the leaderboard.`,()=>ctx.configure({...sdkDaily(),turn:s.turn})),
+    el('p',{class:'fine sdk-join'},'Got a room code from a friend? ',join)));
+  ctx.say('Choose who you want to play.');
+  return wrap;
+}
 function sdkDailySetup(s,ctx,wrap){
   const on=sdkOnline(),mate=()=>on?Online.friend:!!(S.names[1]||'').trim();
   const go=el('button',{class:'btn primary big sdk-start',type:'button'},on&&!Online.friend?'Waiting for your friend…':'Start the clock');
@@ -774,7 +791,7 @@ function sdkDailySetup(s,ctx,wrap){
   const normal=el('button',{class:'btn',type:'button'},'Play a normal game');normal.disabled=!ctx.live;
   normal.addEventListener('click',()=>ctx.configure({...S.game.create(),turn:s.turn}));
   wrap.append(el('div',{class:'sdk-setup big'},el('span',{class:'chip new'},'Daily challenge'),el('h3',{},sdkDayName(s.day)),
-    el('p',{class:'fine'},`Everyone gets this puzzle today. Race your friend in rapid fire with no time limit: the higher score wins, and your pair’s time goes on the leaderboard, with 10 seconds added for every wrong number. A new puzzle comes at midnight IST, in ${sdkUntil()}.`),
+    el('p',{class:'fine'},`Everyone gets this puzzle today. Race your friend in rapid fire, for up to an hour: the higher score wins, and your pair’s time goes on the leaderboard, with 10 seconds added for every wrong number. A new puzzle comes at midnight IST, in ${sdkUntil()}.`),
     el('h4',{},'1. Choose who you’re playing'),pickBox,el('h4',{},'2. Start together'),go,el('div',{class:'row'},lb,normal)));
   ctx.say(on?'You both see the board as soon as either of you starts the clock.':'Choose who you’re playing, then start the clock.');
   return wrap;
@@ -784,8 +801,8 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
   blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>s&&s.mode==='daily'?['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     'Daily challenge: everyone gets the same puzzle and the same bonus squares each day, and a new one comes at midnight IST. Play it with a friend on one screen or on two devices.',
-    'It plays like rapid fire with no game clock: both of you place numbers at once until the board is full. Scoring is by difficulty, ×2 and ×3 squares multiply, a wrong number costs the player who placed it 1 point, and that player then scores nothing for the squares they fill for 5 seconds, 2 seconds longer with each mistake after (7, 9, 11…).',
-    'The clock starts when you tap Start the clock and stops when the last square is filled. Every wrong number, by either of you, adds 10 seconds to your pair’s time on the daily leaderboard. Only your first finished game each day counts; play again for practice.']:['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
+    'It plays like rapid fire: both of you place numbers at once until the board is full, for up to an hour. Scoring is by difficulty, ×2 and ×3 squares multiply, a wrong number costs the player who placed it 1 point, and that player then scores nothing for the squares they fill for 5 seconds, 2 seconds longer with each mistake after (7, 9, 11…).',
+    'The clock starts when you tap Start the clock and stops when the last square is filled. After an hour the game ends, and an unfinished board doesn’t go on the leaderboard. Every wrong number, by either of you, adds 10 seconds to your pair’s time on the daily leaderboard. Only your first finished game each day counts; play again for practice.']:['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     !s||s.scoring==='diff'
       ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for 5 seconds, and each mistake after that adds 2 seconds (7, 9, 11…). You can also choose number value scoring, where a correct number scores its own value.'
       :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for 5 seconds, and each mistake after that adds 2 seconds (7, 9, 11…). You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
@@ -794,9 +811,9 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
   win:s=>s&&s.mode==='daily'?'When the board is full, the higher score wins, and the fastest pairs of the day top the leaderboard.':'When the board is full or time is up, the higher score wins. A tie is possible.',
   how:'Click an empty square, then a number.',
   create:prev=>prev&&prev.mode==='daily'?sdkDaily():({g:sdkGameId(),...sdkBoard('medium'),score:[0,0],n:0,last:null,
-      set:0,mode:'rapid',scoring:'diff',turnLimit:0,limit:SDK_GAME,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0,bot:prev&&prev.bot?1:0}),
+      set:0,mode:'rapid',scoring:'diff',turnLimit:0,limit:SDK_GAME,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0,bot:prev&&prev.bot?1:0,vs:prev&&prev.vs||0}),
   moves:s=>s.mode!=='turns'||s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].map(d=>sdkPlace(s,i,d,0))),
-  hasMove:(s,p)=>s.mode==='daily'?s.grid.includes(0):s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
+  hasMove:(s,p)=>s.mode==='daily'?!s.ended&&s.grid.includes(0):s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
   anyTurn:s=>s.mode!=='turns',
   ready:s=>!!s.set||s.n>0,
   status:s=>s.mode==='daily'?'Daily challenge: both play at once':s.mode==='rapid'?'Rapid fire: both play at once':null,
@@ -806,11 +823,11 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
     return sdkPlace(s,i,Math.random()<.75?s.sol[i]:pick([1,2,3,4,5,6,7,8,9].filter(d=>d!==s.sol[i])),0,s.mode==='rapid'?R(0,1):s.turn);
   },
   result:s=>{
-    const timeUp=s.mode==='rapid'?s.ended:s.out[0]&&s.out[1];
+    const timeUp=s.mode!=='turns'?s.ended:s.out[0]&&s.out[1];
     if(s.grid.includes(0)&&!timeUp) return null;
     const [a,b]=s.score,tally=`${timeUp&&s.grid.includes(0)?'Time is up. ':''}Points: ${name(0)} ${a}, ${name(1)} ${b}.`;
     /* daily: the pair's time for the leaderboard rides along with the result */
-    const day=s.mode==='daily'?{daily:1,ms:s.fin-s.t0,wrong:s.wrong,total:s.fin-s.t0+s.wrong*SDK_PEN}:{};
+    const day=s.mode==='daily'&&!s.grid.includes(0)?{daily:1,ms:s.fin-s.t0,wrong:s.wrong,total:s.fin-s.t0+s.wrong*SDK_PEN}:{};
     const why=day.daily?`${tally} Time ${sdkUp(day.ms)} + ${s.wrong} wrong × 10 s = ${sdkUp(day.total)}.`:tally;
     /* how: the one line under the title on the end card */
     const how=day.daily?`Board done in ${sdkUp(day.total)} (${sdkUp(day.ms)} + ${s.wrong} wrong)`:`${timeUp&&s.grid.includes(0)?'Time ran out':'Board complete'} · ${Math.max(a,b)} to ${Math.min(a,b)}`;
@@ -835,7 +852,7 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
     if(app){
       const key=sdkCount(s)+':'+p;
       if(key!==sdkClock.key){sdkClock.key=key;sdkClock.t=Date.now()}
-      sdkClock.timeout=daily?null:rapid
+      sdkClock.timeout=rapid
         ?()=>ctx.play({...clone(s),ended:1},null,{silent:true,op:st=>st.ended?null:{...st,ended:1}})
         :()=>{const spent=Date.now()-sdkClock.t,out=s.limit&&s.clock[p]-spent<=0;ctx.play(out?sdkTimeout(s):sdkSkip(s,spent),null,{silent:true})};
       if(s.last){const k=JSON.stringify(s.last);if(k!==sdkFx.key){const seen=sdkFx.key!=='';sdkFx.key=k;if(seen)setTimeout(()=>sdkEffect(s.last,s),0)}}
@@ -843,6 +860,7 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
     }
     const wrap=el('div',{class:'sdk'+(rapid?' rapid':'')});
     if(app&&!started&&!s.set&&daily) return sdkDailySetup(s,ctx,wrap);
+    if(app&&!started&&!s.set&&!s.vs&&!sdkOnline()) return sdkChooser(s,ctx,wrap);
 
     /* set-up comes first, on its own; Start game puts the board on screen */
     if(app&&!started&&!s.set){
@@ -852,15 +870,21 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
       const diff=s.diff||'medium',level=(label,d)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(diff===d)},label);
         b.disabled=!ctx.live;b.addEventListener('click',()=>{if(diff!==d)ctx.configure({...clone(s),...sdkBoard(d)})});return b};
       /* seat 1 can be the computer (js/sdkbot.js), on one screen only */
-      const rows=[sdkOnline()?null:row('Opponent',pick2('A friend',!s.bot,{bot:0}),pick2('The computer',!!s.bot,{bot:1})),row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
+      /* who you're playing was chosen on the screen before (sdkChooser); Change goes back there, leaving an online match */
+      const change=el('button',{class:'linkish',type:'button'},'Change');change.disabled=!sdkOnline()&&!ctx.live;
+      change.addEventListener('click',()=>{
+        if(!sdkOnline()){ctx.configure({...clone(s),vs:0,bot:0});return}
+        if(!confirm('Leave this online match and choose someone else to play?'))return;
+        Online.end();S.state={...clone(S.state),vs:0,bot:0};S.ui={};renderPlay(true);
+      });
+      const who=sdkOnline()?(Online.friend?`${name(1-Online.me)}, online`:'A friend online (waiting for them to join)'):s.bot?'The computer':'A friend on this screen';
+      const rows=[row('Playing',el('span',{class:'sdk-vs'},who),change),row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
       rows.push(row('Scoring',pick2('By difficulty',s.scoring==='diff',{scoring:'diff'}),pick2('Number value',s.scoring!=='diff',{scoring:'number'})));
       const waitFriend=sdkOnline()&&!Online.friend;
       const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':'Start game');
       go.disabled=!ctx.live||waitFriend;
       go.addEventListener('click',()=>ctx.configure({...clone(s),set:1,start:sdkNow(),deadline:rapid&&s.limit?sdkNow()+s.limit:0,elo:sdkElo(s)}));
-      const today=el('button',{class:'btn sdk-today',type:'button'},'Or play today’s daily challenge →');today.disabled=!ctx.live;
-      today.addEventListener('click',()=>ctx.configure({...sdkDaily(),turn:s.turn}));
-      wrap.append(el('div',{class:'sdk-setup big'},el('h3',{},'Set up the game'),...rows,go,today));
+      wrap.append(el('div',{class:'sdk-setup big'},el('h3',{},'Set up the game'),...rows,go));
       ctx.say('Choose how you want to play, then tap Start game.');
       return wrap;
     }
@@ -952,7 +976,7 @@ if(typeof document!=='undefined'){
     if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||S.over||S.busy) return;
     const s=S.state,fire=()=>{const t=sdkClock.timeout;sdkClock.timeout=null;if(t)t()};
     document.querySelectorAll('#board .sdk-cold').forEach(e=>{const left=sdkCold(s,+e.dataset.cold);e.textContent=`No points ${Math.ceil(left/1000)}s`;e.hidden=left<=0});
-    if(s.mode==='daily'){if(s.t0&&!s.fin)document.querySelectorAll('#board .sdk-dclock').forEach(e=>{e.textContent=sdkUp(sdkTook(s))});return}
+    if(s.mode==='daily'){if(s.t0&&!s.fin&&!s.ended){document.querySelectorAll('#board .sdk-dclock').forEach(e=>{e.textContent=sdkUp(sdkTook(s))});if(sdkTook(s)>=SDK_DAILY_MAX)fire()}return}
     if(s.mode==='rapid'){
       if(!s.deadline||s.ended) return;
       const left=s.deadline-sdkNow();

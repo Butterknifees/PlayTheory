@@ -8,7 +8,7 @@ PlayTheory opens on a page of game cards: pick one (or tap **Surprise me**), rea
 
 **Play it:** open `index.html` in a browser, or visit the GitHub Pages site. It works on phones too: boards shrink to fit, the rules and demo open from **How to play**, and moves that show a preview take two taps (look, then play).
 
-**Play on two devices:** tap **Play online → Challenge a friend** and send the link. Your friend opens it and plays black on their own phone or computer. This needs a free Firebase project; see [ONLINE.md](ONLINE.md).
+**Play on two devices:** open DuSoKu, choose **Play a friend online → Challenge a friend** and send the link. Your friend opens it and plays black on their own phone or computer. This needs a free Firebase project; see [ONLINE.md](ONLINE.md).
 
 ## How it is built
 
