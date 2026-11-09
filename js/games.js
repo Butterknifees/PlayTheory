@@ -681,6 +681,8 @@ function sdkBoard(diff,rnd){
   return{grid,sol,given:grid.map(d=>d?1:0),boost,own:Array(81).fill(-1),diff};
 }
 /* two ways to play: take turns (30 s a turn, optional clock each), or rapid fire (everyone at once, one game clock) */
+/* every game lasts at most 12 minutes (owner, 2026-11-09): rapid fire has one 12-minute clock, take turns 6 minutes each */
+const SDK_GAME=12*60000;
 const sdkNow=()=>Date.now()+(typeof Online!=='undefined'?Online.offset:0);
 const sdkCount=s=>s.n+s.out[0]+s.out[1]+(s.skips||0);
 /* the daily challenge: one puzzle a day (boosters too), the same for everyone, made from the date in India so it changes
@@ -787,12 +789,12 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
     !s||s.scoring==='diff'
       ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for 5 seconds, and each mistake after that adds 2 seconds (7, 9, 11…). You can also choose number value scoring, where a correct number scores its own value.'
       :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for 5 seconds, and each mistake after that adds 2 seconds (7, 9, 11…). You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
-    'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the game clock ends (3, 5 or 10 minutes; 10 is the default).',
-    'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.'],
+    'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the 12-minute game clock ends.',
+    'Take turns: players place one number each in turn. Each player has 6 minutes on their clock, so a game lasts at most 12 minutes; when yours runs out, your opponent plays on alone.'],
   win:s=>s&&s.mode==='daily'?'When the board is full, the higher score wins, and the fastest pairs of the day top the leaderboard.':'When the board is full or time is up, the higher score wins. A tie is possible.',
   how:'Click an empty square, then a number.',
   create:prev=>prev&&prev.mode==='daily'?sdkDaily():({g:sdkGameId(),...sdkBoard('medium'),score:[0,0],n:0,last:null,
-      set:0,mode:'rapid',scoring:'diff',turnLimit:30000,limit:600000,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0,bot:prev&&prev.bot?1:0}),
+      set:0,mode:'rapid',scoring:'diff',turnLimit:0,limit:SDK_GAME,clock:[0,0],out:[0,0],skips:0,deadline:0,ended:0,bot:prev&&prev.bot?1:0}),
   moves:s=>s.mode!=='turns'||s.out[s.turn]?[]:s.grid.flatMap((v,i)=>v?[]:[1,2,3,4,5,6,7,8,9].map(d=>sdkPlace(s,i,d,0))),
   hasMove:(s,p)=>s.mode==='daily'?s.grid.includes(0):s.mode==='rapid'?!s.ended&&s.grid.includes(0):!s.out[p]&&s.grid.includes(0),
   anyTurn:s=>s.mode!=='turns',
@@ -850,10 +852,7 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
       const diff=s.diff||'medium',level=(label,d)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(diff===d)},label);
         b.disabled=!ctx.live;b.addEventListener('click',()=>{if(diff!==d)ctx.configure({...clone(s),...sdkBoard(d)})});return b};
       /* seat 1 can be the computer (js/sdkbot.js), on one screen only */
-      const rows=[sdkOnline()?null:row('Opponent',pick2('A friend',!s.bot,{bot:0}),pick2('The computer',!!s.bot,{bot:1})),row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:600000,clock:[0,0]}),pick2('Take turns',!rapid,{mode:'turns',limit:0,clock:[0,0]}))];
-      if(rapid) rows.push(row('Game time',pick2('3 min',s.limit===180000,{limit:180000}),pick2('5 min',s.limit===300000,{limit:300000}),pick2('10 min',s.limit===600000,{limit:600000})));
-      else rows.push(row('Per turn',pick2('30 s',!!s.turnLimit,{turnLimit:30000}),pick2('No limit',!s.turnLimit,{turnLimit:0})),
-        row('Clock',pick2('Off',!s.limit,{limit:0,clock:[0,0]}),pick2('3 min each',s.limit===180000,{limit:180000,clock:[180000,180000]}),pick2('5 min each',s.limit===300000,{limit:300000,clock:[300000,300000]})));
+      const rows=[sdkOnline()?null:row('Opponent',pick2('A friend',!s.bot,{bot:0}),pick2('The computer',!!s.bot,{bot:1})),row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
       rows.push(row('Scoring',pick2('By difficulty',s.scoring==='diff',{scoring:'diff'}),pick2('Number value',s.scoring!=='diff',{scoring:'number'})));
       const waitFriend=sdkOnline()&&!Online.friend;
       const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':'Start game');
@@ -923,7 +922,7 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
 
     if(app&&daily) wrap.append(el('div',{class:'sdk-sum'},`Daily challenge · ${sdkDayName(s.day)} · each wrong number +10 s`));
     else if(app) wrap.append(el('div',{class:'sdk-sum'},[s.bot?'Vs the computer':null,s.diff==='hard'?'Hard':'Medium',rapid?'Rapid fire':'Take turns',
-      rapid?sdkFmt(s.limit).replace(/:00$/,'')+' min':s.turnLimit?'30 s a turn':'No turn limit',s.scoring==='diff'?'By difficulty':'Number value'].filter(Boolean).join(' · ')));
+      rapid?sdkFmt(s.limit).replace(/:00$/,'')+' min':s.limit?sdkFmt(s.limit).replace(/:00$/,'')+' min each':'No clock',s.scoring==='diff'?'By difficulty':'Number value'].filter(Boolean).join(' · ')));
     if(rapid&&!s.ended) ctx.say(sel==null?(daily?'Fill the board as fast as you can: every wrong number adds 10 seconds to your pair’s time. ':'')+'Both of you play at once. Click an empty square, then a number on your own pad.'+(s.scoring==='diff'?' The strip above the board shows what each number is worth right now.':''):`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);
     else if(sel==null) ctx.say(`Click an empty square, then a number. A right number scores ${s.scoring==='diff'?'its points in the strip above the board':'its value'}, times any booster. A wrong one costs 1 point.${s.turnLimit?' You have 30 seconds a turn.':''}`);
     else if(!s.grid[sel]) ctx.say(`Now pick a number for this square${s.boost[sel]>1?` (a ×${s.boost[sel]} square)`:''}.`);

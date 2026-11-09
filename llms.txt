@@ -6,7 +6,7 @@
 
 - Both players fill in the same sudoku puzzle. Each correct number scores points; numbers with more copies left to place are worth more.
 - Each puzzle has four ×3 and eight ×2 bonus squares. A wrong number costs 1 point.
-- The higher score wins when the board is full or the clock runs out. Games last 3, 5 or 10 minutes.
+- The higher score wins when the board is full or the clock runs out. Games last at most 12 minutes.
 - Play side by side on one screen, or online: send a friend a challenge link or a 5-letter room code.
 - Works on phones, tablets and computers in any modern browser.
 
