@@ -441,11 +441,12 @@ button.card15:not(:disabled):hover{transform:translateY(-3px)}
 .sdk-box{display:grid;grid-template-columns:repeat(3,var(--sk));gap:1px;background:color-mix(in srgb,var(--ink) 35%,transparent)}
 .sc{width:var(--sk);height:var(--sk);border:0;padding:0;margin:0;background:var(--surface);position:relative;display:grid;place-items:center;font:700 calc(var(--sk)*.52) var(--f-display);color:var(--ink);cursor:pointer}
 div.sc{cursor:default}
-.sc.g{background:var(--surface);color:#9aa1ab;font-weight:600}
-.sc.o0{color:var(--left)} .sc.o1{color:var(--right)}
-.sc.o0 .dg,.sc.o1 .dg{font-family:var(--f-display);font-weight:900}
-.sc.b2{background:#fff6d6} .sc.b3{background:#ffe3c2}
-.sc.o0{background:var(--left-soft)} .sc.o1{background:var(--right-soft)}
+/* one calm board (owner, 2026-11-09): every number is black, whoever placed it or if it came with the puzzle, and a filled
+   square looks like any other. Only an open ×2 or ×3 square keeps a soft tint. The score pills say who's ahead. */
+.sc.g{background:var(--surface)}
+.sc .dg{font-weight:800}
+.sc.b2{background:#fbf1d4} .sc.b3{background:#f9e3cf}
+.sc.o0,.sc.o1{background:var(--surface)}
 .sc.peer{background:#edf3fa} .sc.g.peer{background:#e3ebf5}
 .sc.same{background:#d6e6f6}
 .sc.sel{background:#bfd6ef;outline:3px solid var(--brand-blue);outline-offset:-3px;z-index:1}
