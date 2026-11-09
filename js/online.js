@@ -46,7 +46,10 @@ const Online=(()=>{
     return sdkP;
   }
   const denied=e=>/permission.denied/i.test((e&&(e.code||e.message))||'');
-  const snap=()=>JSON.stringify({b:BUILD,gid:S.gid,state:S.state,hist:S.hist.slice(-60),who:S.who.slice(-60),starter:S.starter});
+  /* the past positions are only for undo; a game without undo (DuSoKu) sends zeros, because the other screen only
+     counts them (to know the game has started). Sending them made each move up to ~113 KB by the end of a game */
+  const snap=()=>{const keep=!(S.game&&S.game.noUndo);
+    return JSON.stringify({b:BUILD,gid:S.gid,state:S.state,hist:S.hist.slice(-60).map(h=>keep?h:0),who:S.who.slice(-60),starter:S.starter})};
 
   /* ---------- making and accepting a challenge ---------- */
   const rand=(chars,n)=>Array.from({length:n},()=>chars[R(0,chars.length-1)]).join('');
@@ -128,21 +131,38 @@ const Online=(()=>{
   function push(kind,op){
     if(!st.on||applying||!ref) return;
     const m=id,base=seq,data=snap(),tok=uid+':'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);lastTok=tok;lastData=data;
+    let before=null; // the position this write follows, for the log
     ref.transaction(r=>{
       if(!r) return;
+      before=r.snap;
       if((r.seq||0)===base){r.seq=base+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=data;return r}
       if(!op) return;
       let d;try{d=JSON.parse(r.snap)}catch(e){return}
       const n=op(d.state);if(!n) return;
       d.state=n;r.seq=(r.seq||0)+1;r.kind=kind;r.by=st.me;r.tok=tok;r.snap=JSON.stringify(d);return r;
-    }).then(res=>{if(res.committed)record(m,res.snapshot.val())}).catch(e=>note('Could not send that: '+e.message));
+    }).then(res=>{if(res.committed)record(m,res.snapshot.val(),before)}).catch(e=>note('Could not send that: '+e.message));
   }
   /* every change is also written once to logs/<match>/<seq>, which nobody listens to, so whole games
-     are kept for training a bot (the match itself only holds the last 60 positions) */
-  function record(m,r){
+     are kept for training a bot (the match itself only holds the latest position, plus up to 60 earlier ones in games with undo).
+     A move is logged as only what changed since the position before it: s = {"$d":{field:new value}}, where a list sends
+     just its changed items as {"$":{index:value}}. Anything that isn't a move, and every 25th write, is logged whole,
+     so one lost log write breaks only a few moves. Rebuild a game by applying the entries in seq order */
+  const eq=(x,y)=>JSON.stringify(x)===JSON.stringify(y);
+  function delta(a,b){
+    const o={};
+    for(const k of new Set([...Object.keys(a),...Object.keys(b)])){
+      const x=a[k],y=b[k];if(eq(x,y))continue;
+      if(Array.isArray(x)&&Array.isArray(y)&&x.length<=y.length){const c={};y.forEach((v,i)=>{if(!eq(v,x[i]))c[i]=v});o[k]={$:c}}
+      else o[k]=y===undefined?null:y;
+    }
+    return o;
+  }
+  function record(m,r,before){
     if(!r||!r.seq) return;
-    let d;try{d=JSON.parse(r.snap)}catch(e){return}
-    db.ref('logs/'+m+'/'+r.seq).set({k:r.kind,b:r.by,g:d.gid,s:JSON.stringify(d.state),t:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
+    let d,p=null;try{d=JSON.parse(r.snap)}catch(e){return}
+    if(before&&r.kind==='move'&&r.seq%25)try{p=JSON.parse(before).state}catch(e){}
+    const s=JSON.stringify(p?{$d:delta(p,d.state)}:d.state);
+    db.ref('logs/'+m+'/'+r.seq).set({k:r.kind,b:r.by,g:d.gid,s,t:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
   }
   function setName(p){
     if(!st.on||p!==st.me) return;
