@@ -160,8 +160,11 @@ function resultCard(res,s,over){
   const tiles=g.stats?g.stats(s):[];
   const btn=(t,f,c='btn')=>{const b=el('button',{class:c,type:'button'},t);b.addEventListener('click',f);return b};
   const again=()=>newPosition(true);
-  const main=over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn('Play again',again,'btn primary big');
+  /* Game review leads, like chess; without a move list (a game from before reviews) the old buttons stay */
+  const rv=typeof Review!=='undefined'&&Review.can(s);
+  const main=rv?btn('Game review',()=>Review.open(s),'btn primary big'):over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn('Play again',again,'btn primary big');
   const second=over.daily?btn('Play again (practice)',again):typeof Rating!=='undefined'&&S.gid==='duosudoku'?btn('Player rankings',()=>Rating.open()):btn('Look at the board',shut);
+  const third=rv?over.daily?btn('Leaderboard',()=>Daily.open(s.day)):btn('Play again',again):null;
   res.replaceChildren(el('div',{class:'res-card',role:'dialog','aria-modal':'false','aria-labelledby':'resT'},x,
     el('div',{class:'res-head'},el('h2',{id:'resT'},resTitle(w)),el('p',{},pn(over.how||over.reason))),
     elo,
@@ -169,7 +172,7 @@ function resultCard(res,s,over){
     tiles.length?el('div',{class:'res-who'},...[0,1].map(p=>el('span',{class:'p'+p},el('i',{class:'dot'}),name(p)))):null,
     tiles.length?el('div',{class:'res-tiles'},...tiles.map(t=>el('div',{class:'res-tile '+t.tone},
       el('div',{class:'vs'},el('b',{class:'v0'},String(t.v[0])),el('b',{class:'v1'},String(t.v[1]))),el('small',{},t.label)))):null,
-    el('div',{class:'res-go'},main,el('div',{class:'row'},second,btn('All games',goHome)))));
+    el('div',{class:'res-go'},main,el('div',{class:'row'+(third?' three':'')},third,second,btn('All games',goHome)))));
   res.onclick=e=>{if(e.target===res)shut()};
 }
 
@@ -442,7 +445,7 @@ function boot(){
   document.addEventListener('click',tapToConfirm,true);
   let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{fitBox($('board'));fitBox($('demoBox'));document.querySelectorAll('.gprev.drawn').forEach(fitPreview);if(!narrow())closeSheet()},120)});
   updateNowPlaying();
-  buildHome();Daily.init();Rating.init();
+  buildHome();Daily.init();Rating.init();Review.init();
   addEventListener('hashchange',route);addEventListener('popstate',route);
   /* switching tab or app, or locking the phone, silences everything; coming back picks the music up again */
   const away=()=>{Music.stop();const ac=Sound.ac;if(ac&&ac.state==='running')ac.suspend().catch(()=>{});updateNowPlaying()};

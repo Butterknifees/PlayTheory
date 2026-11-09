@@ -715,6 +715,8 @@ function sdkPlace(s,i,d,spent,p=s.turn){
   let wait=0;
   if(!ok){const k=++(n.miss||(n.miss=[0,0]))[p];if(s.mode!=='turns'){wait=sdkColdFor(k);(n.cold||(n.cold=[0,0]))[p]=sdkNow()+wait}}
   n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n,...(cold?{cold:1}:{}),...(wait?{wait}:{})};
+  /* every move, for the game review (js/review.js): square, number, player, right, points, server time, in the pause */
+  (n.log||(n.log=[])).push([i,d,p,ok?1:0,pts,sdkNow(),cold?1:0]);
   if(s.mode==='daily'){if(!ok)n.wrong++;else if(!n.grid.includes(0))n.fin=sdkNow();return n} // the clock stops on the last square
   if(s.mode==='rapid'){if(!n.deadline&&n.limit)n.deadline=sdkNow()+n.limit;return n}
   if(n.limit&&spent) n.clock[p]=Math.max(0,n.clock[p]-spent);
@@ -754,7 +756,7 @@ function sdkDailySetup(s,ctx,wrap){
   const on=sdkOnline(),mate=()=>on?Online.friend:!!(S.names[1]||'').trim();
   const go=el('button',{class:'btn primary big sdk-start',type:'button'},on&&!Online.friend?'Waiting for your friend…':'Start the clock');
   const sync=()=>{go.disabled=!ctx.live||!mate()};sync();
-  go.addEventListener('click',()=>{if(mate())ctx.configure({...clone(s),set:1,t0:sdkNow(),elo:sdkElo(s)})});
+  go.addEventListener('click',()=>{if(mate())ctx.configure({...clone(s),set:1,t0:sdkNow(),start:sdkNow(),elo:sdkElo(s)})});
   let pickBox;
   if(on) pickBox=el('p',{class:'sdk-mate'},Online.friend?`You’re playing ${name(1-Online.me)}, on their own device.`:'Waiting for your friend to open the link or type the room code.');
   else{
@@ -856,7 +858,7 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
       const waitFriend=sdkOnline()&&!Online.friend;
       const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':'Start game');
       go.disabled=!ctx.live||waitFriend;
-      go.addEventListener('click',()=>ctx.configure({...clone(s),set:1,deadline:rapid&&s.limit?sdkNow()+s.limit:0,elo:sdkElo(s)}));
+      go.addEventListener('click',()=>ctx.configure({...clone(s),set:1,start:sdkNow(),deadline:rapid&&s.limit?sdkNow()+s.limit:0,elo:sdkElo(s)}));
       const today=el('button',{class:'btn sdk-today',type:'button'},'Or play today’s daily challenge →');today.disabled=!ctx.live;
       today.addEventListener('click',()=>ctx.configure({...sdkDaily(),turn:s.turn}));
       wrap.append(el('div',{class:'sdk-setup big'},el('h3',{},'Set up the game'),...rows,go,today));
