@@ -1,5 +1,5 @@
 "use strict";
-/* The daily challenge: everyone gets the same Duo Sudoku each day (sdkDaily in games.js, new at midnight IST) and races a
+/* The daily challenge: everyone gets the same DuSoKu each day (sdkDaily in games.js, new at midnight IST) and races a
    friend on it. When the board is full, the pair's time plus 10 seconds for every wrong number is saved at daily/<day>/<uid>
    in the online database (database.rules.json), with both names and scores. Saving needs a Google sign-in, so a player who
    isn't signed in is asked to at the end. Only the first finished game each day counts for an account, and online the
@@ -96,7 +96,7 @@ const Daily=(()=>{
     const rk=el('button',{class:'btn',type:'button'},'Player rankings');rk.addEventListener('click',()=>Rating.open());
     box.replaceChildren(el('div',{class:'daily-txt'},
       el('div',{class:'gmeta'},el('span',{class:'chip new'},'Daily challenge'),el('span',{class:'chip'},sdkDayName(d))),
-      el('h3',{},'Today’s Duo Sudoku'),
+      el('h3',{},'Today’s DuSoKu'),
       el('p',{},'The same puzzle for everyone today. Pick a friend, race them in rapid fire, and put your time on the leaderboard (sign in to be listed). Every wrong number adds 10 seconds.')),
       el('div',{class:'daily-go'},play,lb,rk));
   }

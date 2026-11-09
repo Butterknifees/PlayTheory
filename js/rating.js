@@ -69,6 +69,8 @@ const Rating=(()=>{
     if(nudged) return;nudged=true;
     setTimeout(()=>{if(S.over&&!uid()&&!$('dailyDlg').open)Account.open(null,PITCH)},2600);
   }
+  /* this game's rating change, once it's saved: {p, from, to} */
+  function change(s){const k=Online.on&&s&&s.g?Online.id+'/'+s.g:'';return last&&last.key===k&&!last.err?last:null}
   /* a line for the result box: the rating change, or why there wasn't one */
   function line(s){
     if(!s||S.gid!=='duosudoku') return null;
@@ -126,5 +128,5 @@ const Rating=(()=>{
     $('rankDlg').addEventListener('click',e=>{if(e.target===$('rankDlg'))close()});
     $('rankDlg').addEventListener('close',unwatch);
   }
-  return {init,open,publish,snap,tag,result,line,summary,load,PITCH};
+  return {init,open,publish,snap,tag,result,line,change,summary,load,PITCH,POOLS};
 })();

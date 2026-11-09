@@ -36,5 +36,15 @@ const Mascot=(()=>{
     };
     if(img.complete&&img.naturalWidth) run(); else{img.addEventListener('load',run,{once:true});img.addEventListener('error',hide,{once:true})}
   }
-  return {cheer,hide,preload};
+  /* the end card: Play bows once inside it and holds the last frame (a draw just gets the standing knight) */
+  function pose(bow){
+    preload();
+    const sp=el('div',{class:'mascot-sprite'});sp.style.backgroundImage=`url("${SRC}")`;
+    if(!bow||reduceMotion()){frame(sp,bow?N-1:0);return sp}
+    frame(sp,0);
+    const run=()=>{const t0=performance.now(),step=now=>{const k=Math.max(0,Math.min(N-1,Math.floor((now-t0)/1000*FPS)));frame(sp,k);if(k<N-1&&sp.isConnected)requestAnimationFrame(step)};requestAnimationFrame(step)};
+    if(img.complete&&img.naturalWidth) run(); else img.addEventListener('load',run,{once:true});
+    return sp;
+  }
+  return {cheer,hide,preload,pose};
 })();

@@ -1,5 +1,5 @@
 "use strict";
-/* Duo Sudoku bots: rule-based players meant to feel like a person across the table, not to win every game.
+/* DuSoKu bots: rule-based players meant to feel like a person across the table, not to win every game.
    A bot rates every empty square by a few human habits (easy squares first, boosts, big numbers, staying near
    its last move, sticking with the same number), picks one at random weighted by those ratings, sometimes gets
    the number wrong, and waits a human-looking time. With `adapt` it steers towards a narrow result: P.goal 'win'

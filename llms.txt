@@ -1,8 +1,8 @@
 # PlayTheory
 
-> PlayTheory (playtheoryhq.com, also called PlayTheory HQ) is a free website of two-player strategy games that run in the browser. The game available now is Duo Sudoku, a two-player sudoku. No sign-up and nothing to install.
+> PlayTheory (playtheoryhq.com, also called PlayTheory HQ) is a free website of two-player strategy games that run in the browser. The game available now is DuSoKu, a two-player sudoku. No sign-up and nothing to install.
 
-## Duo Sudoku
+## DuSoKu
 
 - Both players fill in the same sudoku puzzle. Each correct number scores points; numbers with more copies left to place are worth more.
 - Each puzzle has four ×3 and eight ×2 bonus squares. A wrong number costs 1 point.
@@ -12,6 +12,6 @@
 
 ## Pages
 
-- [Play Duo Sudoku](https://playtheoryhq.com/): the game itself
-- [Duo Sudoku rules and FAQ](https://playtheoryhq.com/duo-sudoku/): how two-player sudoku works
+- [Play DuSoKu](https://playtheoryhq.com/): the game itself
+- [DuSoKu rules and FAQ](https://playtheoryhq.com/duo-sudoku/): how two-player sudoku works
 - [Games like chess](https://playtheoryhq.com/games-like-chess/): two-player strategy games with no luck and nothing hidden

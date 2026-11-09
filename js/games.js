@@ -644,7 +644,7 @@ def({id:'to15',name:'3-to-15',kind:'Impartial',sfx:'card',motif:'card',
     return el('div',{class:'c15'},deck,el('div',{class:'hands'},hand(0),hand(1)));
   }});
 
-/* ---------------- Duo Sudoku ---------------- */
+/* ---------------- DuSoKu ---------------- */
 /* puzzles are made here: fill a random solved grid, then remove numbers one at a time,
    keeping a number only when removing it would allow a second solution */
 const SDK={
@@ -713,7 +713,7 @@ function sdkPlace(s,i,d,spent,p=s.turn){
   const n=clone(s),ok=s.sol[i]===d,cold=ok&&sdkCold(s,p)>0,pts=ok?cold?0:sdkValue(s,d)*s.boost[i]:-1;
   if(ok){n.grid[i]=d;n.own[i]=p}
   let wait=0;
-  if(!ok&&s.mode!=='turns'){const k=++(n.miss||(n.miss=[0,0]))[p];wait=sdkColdFor(k);(n.cold||(n.cold=[0,0]))[p]=sdkNow()+wait}
+  if(!ok){const k=++(n.miss||(n.miss=[0,0]))[p];if(s.mode!=='turns'){wait=sdkColdFor(k);(n.cold||(n.cold=[0,0]))[p]=sdkNow()+wait}}
   n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n,...(cold?{cold:1}:{}),...(wait?{wait}:{})};
   if(s.mode==='daily'){if(!ok)n.wrong++;else if(!n.grid.includes(0))n.fin=sdkNow();return n} // the clock stops on the last square
   if(s.mode==='rapid'){if(!n.deadline&&n.limit)n.deadline=sdkNow()+n.limit;return n}
@@ -776,7 +776,7 @@ function sdkDailySetup(s,ctx,wrap){
   return wrap;
 }
 
-def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
+def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:true,noUndo:true,
   blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>s&&s.mode==='daily'?['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     'Daily challenge: everyone gets the same puzzle and the same bonus squares each day, and a new one comes at midnight IST. Play it with a friend on one screen or on two devices.',
@@ -808,7 +808,23 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
     /* daily: the pair's time for the leaderboard rides along with the result */
     const day=s.mode==='daily'?{daily:1,ms:s.fin-s.t0,wrong:s.wrong,total:s.fin-s.t0+s.wrong*SDK_PEN}:{};
     const why=day.daily?`${tally} Time ${sdkUp(day.ms)} + ${s.wrong} wrong × 10 s = ${sdkUp(day.total)}.`:tally;
-    return a===b?{winner:'draw',reason:why,...day}:{winner:a>b?0:1,reason:why,...day};
+    /* how: the one line under the title on the end card */
+    const how=day.daily?`Board done in ${sdkUp(day.total)} (${sdkUp(day.ms)} + ${s.wrong} wrong)`:`${timeUp&&s.grid.includes(0)?'Time ran out':'Board complete'} · ${Math.max(a,b)} to ${Math.min(a,b)}`;
+    return a===b?{winner:'draw',reason:why,how,...day}:{winner:a>b?0:1,reason:why,how,...day};
+  },
+  /* the end card: three tiles of who did what, and a word from Play the knight */
+  stats:s=>{
+    const n=(p,f)=>s.own.filter((o,i)=>o===p&&f(i)).length,miss=s.miss||[0,0];
+    return [{label:'Right',tone:'good',v:[0,1].map(p=>n(p,()=>1))},{label:'Bonus squares',tone:'gold',v:[0,1].map(p=>n(p,i=>s.boost[i]>1))},{label:'Wrong',tone:'bad',v:[0,1].map(p=>miss[p])}];
+  },
+  remark:(s,over)=>{
+    const [a,b]=s.score,w=over.winner,miss=s.miss||[0,0],bon=[0,1].map(p=>s.own.filter((o,i)=>o===p&&s.boost[i]>1).length),out=[];
+    if(w==='draw') out.push(`Dead level at ${a} points each. You two are well matched.`);
+    else{const m=Math.abs(a-b),l=1-w;out.push(m<=3?`That was close: ${name(w)} won by just ${m} ${m===1?'point':'points'}.`:m>=a+b-m?`${name(w)} ran away with it, ${Math.max(a,b)} to ${Math.min(a,b)}.`:`${name(w)} won by ${m} points. Next time, ${name(l)}!`)}
+    if(bon[0]!==bon[1]){const p=bon[0]>bon[1]?0:1;out.push(`${name(p)} grabbed ${bon[p]} of the ${bon[0]+bon[1]} bonus squares that got filled.`)}
+    else if(!miss[0]&&!miss[1]) out.push('Not a single wrong number between you. Clean play!');
+    if(miss[0]!==miss[1]&&out.length<2){const p=miss[0]>miss[1]?0:1;out.push(`${miss[p]} wrong ${miss[p]===1?'number':'numbers'} cost ${name(p)} points along the way.`)}
+    return out.join(' ');
   },
   render(s,ctx){
     const p=s.turn,app=typeof ctx.configure==='function',daily=s.mode==='daily',rapid=s.mode!=='turns',started=s.n>0,sel=ctx.ui.sel;
@@ -850,7 +866,7 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
 
     /* scores and clocks */
     const pill=q=>el('div',{class:'sdk-score s'+q+(!rapid&&p===q&&!s.out[q]?' on':'')+(s.out[q]?' out':'')},
-      el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&sdkCold(s,q)>0?el('span',{class:'sdk-cold','data-cold':q},`No points ${Math.ceil(sdkCold(s,q)/1000)}s`):null,app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),el('b',{},String(s.score[q])),
+      el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&!S.over&&sdkCold(s,q)>0?el('span',{class:'sdk-cold','data-cold':q},`No points ${Math.ceil(sdkCold(s,q)/1000)}s`):null,app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),el('b',{},String(s.score[q])),
       !rapid&&s.limit?el('span',{class:'sdk-clock','data-p':q},s.out[q]?'Time’s up':sdkFmt(s.clock[q]-(app&&started&&q===p?Date.now()-sdkClock.t:0))):null);
     wrap.append(el('div',{class:'sdk-scores'},pill(0),pill(1)));
     if(daily) wrap.append(el('div',{class:'sdk-drow'},el('div',{class:'sdk-gclock sdk-dclock'},sdkUp(sdkTook(s))),

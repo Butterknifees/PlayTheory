@@ -191,7 +191,18 @@ const Sound=(()=>{
     const bus=k==='music'?musicBus:sfxBus,lvl=k==='music'?MUSIC_LEVEL:SFX_LEVEL;
     bus.gain.cancelScheduledValues(ac.currentTime);bus.gain.setTargetAtTime(v?lvl:0,ac.currentTime,.15);
   }
-  return {init,unlock,ready,fx,pref,setPref,get ac(){return ac},get musicBus(){return musicBus},INST,PADS,BASS,DRUM};
+  /* a recorded clip (like the sung "DuSoKu" when a round starts), on the effects bus so the Sounds switch mutes it too */
+  const clips={};
+  function load(url){
+    if(!clips[url]) clips[url]=fetch(url).then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer()})
+      .then(b=>new Promise((ok,no)=>{init();ac.decodeAudioData(b,ok,no)})).catch(e=>{delete clips[url];throw e});
+    return clips[url];
+  }
+  function clip(url,g=1){
+    if(!pref.sfx) return;
+    unlock();load(url).then(buf=>{if(!ac||ac.state!=='running'||!pref.sfx)return;const src=ac.createBufferSource(),v=ac.createGain();v.gain.value=g;src.buffer=buf;src.connect(v);v.connect(master);src.start()}).catch(()=>{});
+  }
+  return {init,unlock,ready,fx,clip,load,pref,setPref,get ac(){return ac},get musicBus(){return musicBus},INST,PADS,BASS,DRUM};
 })();
 
 const Music=(()=>{

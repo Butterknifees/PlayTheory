@@ -1,7 +1,7 @@
 {
   "name": "PlayTheory",
   "short_name": "PlayTheory",
-  "description": "Two-player strategy games. Play Duo Sudoku against a friend on one screen or online.",
+  "description": "Two-player strategy games. Play DuSoKu against a friend on one screen or online.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

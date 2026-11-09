@@ -45,8 +45,7 @@ function celebrate(){
   if(S.over.daily) Daily.done(S.state,S.over); // the pair's time goes on today's leaderboard
   Rating.result(S.state,S.over); // online between two signed-in players: new ratings
   if(w==='draw'){Sound.fx('draw');return}
-  Sound.fx('win',{id:S.gid});
-  Mascot.cheer(name(w));
+  Sound.fx('win',{id:S.gid}); // Play the knight bows inside the end card (resultCard)
   FX.confetti([FX.color(PC[w]),FX.cssVar('--brand-blue'),'#ffffff',w===0?'#9cc3ea':'#7d7d7d']);
 }
 
@@ -71,7 +70,7 @@ function syncMusic(){
 
 /* once the first move is made, everything but the game itself steps aside until the game ends */
 function syncFocus(){
-  const on=document.body.dataset.view==='play'&&(S.hist.length>0||!!(S.game.ready&&S.game.ready(S.state)))&&!S.over;
+  const on=document.body.dataset.view==='play'&&(S.hist.length>0||!!(S.game.ready&&S.game.ready(S.state)))&&!(S.over&&resShut===S.state);
   if(on===document.body.classList.contains('focus')) return;
   document.body.classList.toggle('focus',on);
   if(on) try{window.scrollTo({top:0})}catch(e){}
@@ -82,6 +81,7 @@ function renderPlay(moved){
   check();
   syncMusic();syncFocus();
   const s=S.state,over=S.over;
+  singIn(s);
   $('play').dataset.turn=over?'':s.turn;
   const t=$('turn');t.className='turn t'+s.turn+(moved?' bump':'');
   const free=!!(S.game.anyTurn&&S.game.anyTurn(s)),mine=Online.on&&s.turn===Online.me,waiting=Online.on&&!over&&!mine&&!free;
@@ -91,13 +91,14 @@ function renderPlay(moved){
   t.parentElement.classList.toggle('free',free);
   [0,1].forEach(p=>{const b=$('f'+p);b.textContent=name(p);b.setAttribute('aria-pressed',String(S.starter===p));b.disabled=started});
   const res=$('result');
-  if(over){
+  if(over&&resShut!==s) resultCard(res,s,over);
+  else if(over){
     const w=over.winner;res.hidden=false;res.className='result'+(w==='draw'?'':' w'+w);
     const again=el('button',{class:'btn',type:'button'},'Play again');again.addEventListener('click',()=>newPosition(true));
     const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Choose another game');nxt.addEventListener('click',goHome);
-    const lb=over.daily?el('button',{class:'btn',type:'button'},'Leaderboard'):null;if(lb)lb.addEventListener('click',()=>Daily.open(s.day));
+    const show=el('button',{class:'btn',type:'button'},'Show result');show.addEventListener('click',()=>{resShut=null;renderPlay()});
     if(over.daily) again.textContent='Play again (practice)';
-    res.replaceChildren(el('div',{},el('b',{},w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You win!':`${name(w)} wins`),el('p',{},pn(over.reason)),Rating.line(s)),el('div',{class:'row'},lb,again,nxt));
+    res.replaceChildren(el('div',{},el('b',{},resTitle(w)),el('p',{},pn(over.reason))),el('div',{class:'row'},show,again,nxt));
   }else res.hidden=true;
   S.hint=null;
   const board=$('board');
@@ -110,6 +111,44 @@ function renderPlay(moved){
   $('undo').disabled=!started||S.busy||!Online.mayUndo()||!!S.game.noUndo;
   $('undo').hidden=!!S.game.noUndo;
   if(S.entering){S.entering=false;enterBoard()}
+}
+
+/* DuSoKu: a voice sings the name as each round starts (Start game here, or the friend's on their screen) */
+const SING='audio/dusoku.mp3';let sung=null;
+function singIn(s){
+  if(S.gid!=='duosudoku'||!s.set||s.n||S.over||sung===s.g) return;
+  sung=s.g;Sound.clip(SING);
+}
+
+/* the end card over the board: who won and how, the rating change, a word from Play the knight, who did what, and
+   what next. × (or a tap outside it) puts it away to look at the final board; Show result brings it back. */
+let resShut=null,resPose=null;
+const resTitle=w=>w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You won!':`${name(w)} won`;
+function resultCard(res,s,over){
+  const w=over.winner,g=S.game;
+  res.hidden=false;res.className='res-pop'+(w==='draw'?' draw':' w'+w);
+  const shut=()=>{resShut=s;renderPlay()};
+  if(!resPose||resPose.s!==s) resPose={s,node:Mascot.pose(w!=='draw')};
+  const x=el('button',{class:'dlg-x',type:'button','aria-label':'Close and look at the board'},'×');x.addEventListener('click',shut);
+  /* the rating: the new number and the change once it's saved, otherwise why there isn't one */
+  const ch=typeof Rating!=='undefined'?Rating.change(s):null,d=ch?ch.to-ch.from:0;
+  const elo=ch?el('div',{class:'res-elo'},el('b',{},String(ch.to)),el('span',{class:d>=0?'up':'down'},(d>=0?'+':'−')+Math.abs(d)),el('small',{},`${Rating.POOLS[ch.p]} rating`))
+    :typeof Rating!=='undefined'?Rating.line(s):null;
+  const say=g.remark?g.remark(s,over):w==='draw'?'Well matched!':`Congrats, ${name(w)}!`;
+  const tiles=g.stats?g.stats(s):[];
+  const btn=(t,f,c='btn')=>{const b=el('button',{class:c,type:'button'},t);b.addEventListener('click',f);return b};
+  const again=()=>newPosition(true);
+  const main=over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn('Play again',again,'btn primary big');
+  const second=over.daily?btn('Play again (practice)',again):typeof Rating!=='undefined'&&S.gid==='duosudoku'?btn('Player rankings',()=>Rating.open()):btn('Look at the board',shut);
+  res.replaceChildren(el('div',{class:'res-card',role:'dialog','aria-modal':'false','aria-labelledby':'resT'},x,
+    el('div',{class:'res-head'},el('h2',{id:'resT'},resTitle(w)),el('p',{},pn(over.how||over.reason))),
+    elo,
+    el('div',{class:'res-coach'},resPose.node,el('p',{class:'res-say'},pn(say))),
+    tiles.length?el('div',{class:'res-who'},...[0,1].map(p=>el('span',{class:'p'+p},el('i',{class:'dot'}),name(p)))):null,
+    tiles.length?el('div',{class:'res-tiles'},...tiles.map(t=>el('div',{class:'res-tile '+t.tone},
+      el('div',{class:'vs'},el('b',{class:'v0'},String(t.v[0])),el('b',{class:'v1'},String(t.v[1]))),el('small',{},t.label)))):null,
+    el('div',{class:'res-go'},main,el('div',{class:'row'},second,btn('All games',goHome)))));
+  res.onclick=e=>{if(e.target===res)shut()};
 }
 
 /* pieces pop onto the table one after another */
@@ -141,6 +180,7 @@ function showIntro(){
 }
 function enterGame(){
   Mascot.preload(); // fetch the bow now so it's ready when someone wins
+  if(S.gid==='duosudoku') Sound.load(SING).catch(()=>{}); // and the sung name, for when the round starts
   Sound.unlock().then(()=>{Sound.fx('enter',{id:S.gid});Music.play(S.gid);updateNowPlaying()});
   const box=$('intro');box.classList.add('out');setTimeout(()=>{if(box.classList.contains('out'))box.hidden=true},600);
   S.entering=true;renderPlay();

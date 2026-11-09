@@ -413,7 +413,7 @@ button.card15:not(:disabled):hover{transform:translateY(-3px)}
 .crumb{display:flex;align-items:center;gap:8px;margin-bottom:-6px}
 .back{font-weight:700}
 
-/* ================= Duo Sudoku ================= */
+/* ================= DuSoKu ================= */
 .sdk{--sk:clamp(32px,9.4vw,48px);display:flex;flex-direction:column;align-items:center;gap:12px}
 .sdk-setup{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);width:100%;max-width:calc(var(--sk)*9 + 18px)}
 .sdk-setup.big{gap:12px;padding:16px;max-width:460px}
@@ -668,8 +668,8 @@ div.sc{cursor:default}
   .focus .play{padding:8px;gap:8px}
   .focus .board{padding:8px 4px}
   .focus .app{gap:0}
-  .focus .sdk{--sk:min(46px,calc((100vw - 52px)/9),calc((100vh - 330px)/9));--sk:min(46px,calc((100vw - 52px)/9),calc((100dvh - 330px)/9));gap:8px}
-  .focus .sdk:has(.sdk-worth){--sk:min(46px,calc((100vw - 52px)/9),calc((100vh - 418px)/9));--sk:min(46px,calc((100vw - 52px)/9),calc((100dvh - 418px)/9))}
+  .focus .sdk{--sk:min(52px,calc((100vw - 58px)/9),calc((100vh - 330px)/9));--sk:min(52px,calc((100vw - 58px)/9),calc((100dvh - 330px)/9));gap:8px}
+  .focus .sdk:has(.sdk-worth){--sk:min(52px,calc((100vw - 58px)/9),calc((100vh - 418px)/9));--sk:min(52px,calc((100vw - 58px)/9),calc((100dvh - 418px)/9))}
   .focus .sdk-worth{padding:3px;gap:2px}
   .focus .sdk-worth .wv{flex-direction:row;justify-content:center;align-items:baseline;gap:2px;padding:4px 0}
   .focus .sdk-worth b{font-size:13px}
@@ -683,11 +683,11 @@ div.sc{cursor:default}
   .focus .sdk-pad .key{aspect-ratio:auto;height:max(34px,calc(var(--sk)*.92));flex-direction:row;align-items:baseline;justify-content:center;gap:3px;padding:0;line-height:1;place-content:center;align-content:center}
   .focus .sdk-pad .key small{font-size:9.5px}
 }
-@media (max-width:600px){ .focus{padding-block:6px 10px} }
+@media (max-width:600px){ .focus{padding-block:6px 10px;padding-inline:max(6px,env(safe-area-inset-left,0px))} .focus .play{border-radius:10px} }
 /* wide screens: each player's pad sits beside the board, and the board is sized to the window height */
 @media (min-width:881px){
-  .focus .sdk{--sk:min(52px,calc((100vh - 330px)/9));--sk:min(52px,calc((100dvh - 330px)/9));display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:24px;grid-auto-flow:row dense;justify-items:center;align-items:center;width:100%}
-  .focus .sdk:has(.sdk-worth){--sk:min(52px,calc((100vh - 380px)/9));--sk:min(52px,calc((100dvh - 380px)/9))}
+  .focus .sdk{--sk:min(76px,calc((100vw - 560px)/9),calc((100vh - 250px)/9));--sk:min(76px,calc((100vw - 560px)/9),calc((100dvh - 250px)/9));display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:24px;grid-auto-flow:row dense;justify-items:center;align-items:center;width:100%}
+  .focus .sdk:has(.sdk-worth){--sk:min(76px,calc((100vw - 560px)/9),calc((100vh - 310px)/9));--sk:min(76px,calc((100vw - 560px)/9),calc((100dvh - 310px)/9))}
   .focus .sdk>*{grid-column:1/-1}
   .focus .sdk>.sdk-grid{grid-column:2}
   .focus .sdk>.sdk-pads{display:contents}
@@ -695,7 +695,15 @@ div.sc{cursor:default}
   .focus .sdk-pads>:first-child{grid-column:1;justify-self:end}
   .focus .sdk-pads>:last-child{grid-column:3;justify-self:start}
   .focus .sdk-pads.one>*{grid-column:3}
-  .focus .sdk-scores{max-width:calc(var(--sk)*9 + 18px)}
+  .focus .sdk-scores{display:contents}
+  .focus .sdk-score{width:100%;max-width:230px}
+  .focus .sdk-score.s0{grid-column:1;justify-self:end}
+  .focus .sdk-score.s1{grid-column:3;justify-self:start}
+  .focus .sdk>.sdk-gclock,.focus .sdk>.sdk-drow,.focus .sdk>.sdk-turnbar{grid-column:2}
+  .focus .sdk-worth{max-width:calc(var(--sk)*9 + 6px)}
+  .focus .play{padding-top:10px}
+  .focus .play .focus-exit{position:absolute;bottom:14px;left:14px;z-index:2}
+  .focus .board{padding-block:10px}
 }
 @media (max-width:420px){
   h1{font-size:20px}
@@ -810,3 +818,41 @@ div.sc{cursor:default}
 .sdk-toast span{font-size:14px;color:var(--ink)}
 .sdk-toast.out{opacity:0;transform:translate(-50%,-12px);transition:opacity .35s,transform .35s}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,-12px)}}
+
+/* the end card: sits over the board when a game ends (resultCard in js/app.js) */
+.res-pop{position:absolute;inset:0;z-index:20;display:grid;place-items:center;padding:16px;overflow:auto;background:rgba(36,36,36,.38);animation:fadein .25s ease-out}
+.res-card{position:relative;width:min(420px,100%);background:var(--surface);border-radius:20px;overflow:hidden;box-shadow:0 22px 60px rgba(20,26,36,.35);animation:cardin .35s cubic-bezier(.2,1.2,.4,1)}
+@keyframes fadein{from{opacity:0}}
+@keyframes cardin{from{opacity:0;transform:translateY(18px) scale(.96)}}
+.res-card .dlg-x{background:rgba(255,255,255,.18);color:#fff;z-index:1}
+.res-head{text-align:center;padding:24px 48px 18px;color:#fff;background:var(--neutral)}
+.w0 .res-head{background:var(--left)} .w1 .res-head{background:var(--right)}
+.res-head h2{margin:0;font:900 34px/1.1 var(--f-display);letter-spacing:-.02em}
+.res-head p{margin:6px 0 0;font:700 15px var(--f-display);opacity:.85}
+.res-elo{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:baseline;column-gap:6px;padding:16px 0 0}
+.res-elo b{font:900 40px/1 var(--f-display)}
+.res-elo span{font:800 17px var(--f-display)} .res-elo .up{color:var(--neutral)} .res-elo .down{color:#c0392b}
+.res-elo small{grid-column:1/-1;text-align:center;color:var(--muted);font-weight:700}
+.res-card .elo-line{text-align:center;margin:14px 18px 0}
+.res-coach{display:flex;align-items:flex-end;gap:6px;padding:12px 18px 0}
+.res-coach .mascot-sprite{width:104px;flex:none;margin-bottom:-4px}
+.res-say{position:relative;flex:1;margin:0 0 16px;padding:12px 15px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);font:700 15px/1.4 var(--f-body)}
+.res-say::before{content:"";position:absolute;left:-9px;bottom:16px;border:8px solid transparent;border-right-color:var(--line);border-left:0}
+.res-say::after{content:"";position:absolute;left:-7px;bottom:17px;border:7px solid transparent;border-right-color:var(--surface-2);border-left:0}
+.res-who{display:flex;justify-content:center;gap:16px;padding:0 18px 6px;font:700 13px var(--f-display);color:var(--muted)}
+.res-who span{display:flex;align-items:center;gap:6px;min-width:0}
+.res-who .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.res-who .p0 .dot{background:var(--left)} .res-who .p1 .dot{background:var(--right)}
+.res-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 18px}
+.res-tile{border-radius:14px;background:var(--surface-2);padding:10px 4px 8px;text-align:center}
+.res-tile .vs{display:flex;justify-content:center;gap:12px;font:900 24px/1.1 var(--f-display)}
+.res-tile .v0{color:var(--left)} .res-tile .v1{color:var(--right)}
+.res-tile small{display:block;margin-top:2px;font:800 13px var(--f-display)}
+.res-tile.good small{color:#2f8a5c} .res-tile.gold small{color:#a86f00} .res-tile.bad small{color:#c0392b}
+.res-go{display:grid;gap:8px;padding:16px 18px 18px}
+.res-go .btn{margin:0;width:100%}
+.res-go .btn.primary{background:var(--neutral);border-color:var(--neutral);color:#fff;font:900 20px var(--f-display);padding:14px;border-radius:14px;box-shadow:0 4px 0 #2c7450}
+.res-go .btn.primary:active{transform:translateY(2px);box-shadow:0 2px 0 #2c7450}
+.res-go .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.res-go .row .btn{font:800 15px var(--f-display);padding:12px 8px;border-radius:12px;background:var(--surface-2)}
+@media (max-width:420px){.res-head h2{font-size:28px}.res-coach .mascot-sprite{width:80px}.res-say{font-size:14px}.res-tile .vs{font-size:20px;gap:8px}}
