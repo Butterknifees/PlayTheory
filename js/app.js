@@ -120,6 +120,28 @@ function singIn(s){
   sung=s.g;Sound.clip(SING);
 }
 
+/* the board colours picker (Colours in the top bar, or beside Exit game while playing): the palettes from Skins, and
+   the plain or themed board, both remembered on this device */
+function openLook(){
+  const box=$('lookBody'),dl=$('lookDlg');
+  const draw=()=>{
+    const pick=p=>{
+      const sw=el('span',{class:'pal-sw','aria-hidden':'true'},...p.sw.map((c,i)=>i<3?el('i',{style:`background:${c[0]};color:${c[1]}`},String([5,3,8][i])):el('i',{style:`background:${c}`},i===3?'×2':'×3')));
+      const b=el('button',{class:'pal',type:'button','aria-pressed':String(Skins.pal===p.id)},sw,el('span',{class:'pal-t'},el('b',{},p.name+(p.id==='calm'?' (default)':'')),el('small',{},p.about)));
+      b.addEventListener('click',()=>{Skins.setPal(p.id);Sound.fx('pick');if(S.state&&!S.busy)renderPlay();draw()});
+      return b;
+    };
+    const look=(label,on)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(Skins.on===on)},label);
+      b.addEventListener('click',()=>{if(Skins.on!==on){Skins.set(on);$('lookBtn').setAttribute('aria-pressed',String(on));Sound.fx('pick');if(S.state&&!S.busy)renderPlay();draw()}});return b};
+    const x=el('button',{class:'dlg-x',type:'button','aria-label':'Close'},'×');x.addEventListener('click',()=>dl.close());
+    const done=el('button',{class:'btn primary',type:'button'},'Done');done.addEventListener('click',()=>dl.close());
+    box.replaceChildren(x,el('h2',{},'Board colours'),el('div',{class:'pal-list'},...Skins.PALETTES.map(pick)),
+      el('h3',{},'Board style'),el('div',{class:'lb-tabs',role:'group','aria-label':'Board style'},look('Plain',false),look('Themed (wood)',true)),
+      el('div',{class:'row'},done));
+  };
+  draw();if(!dl.open){try{dl.showModal()}catch(e){dl.setAttribute('open','')}}
+}
+
 /* the end card over the board: who won and how, the rating change, a word from Play the knight, who did what, and
    what next. × (or a tap outside it) puts it away to look at the final board; Show result brings it back. */
 let resShut=null,resPose=null;
@@ -408,6 +430,8 @@ function boot(){
   $('musicBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('music',!Sound.pref.music);if(Sound.pref.music&&$('intro').hidden)Music.play(S.gid);else if(!Sound.pref.music)Music.stop();updateNowPlaying()}));
   $('sfxBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('sfx',!Sound.pref.sfx);Sound.fx('pick');updateNowPlaying()}));
   $('lookBtn').addEventListener('click',()=>{Skins.set(!Skins.on);Sound.fx('pick');updateNowPlaying();if(!S.busy)renderPlay()});
+  $('colorBtn').addEventListener('click',openLook);$('focusLook').addEventListener('click',openLook);
+  $('lookDlg').addEventListener('click',e=>{if(e.target===$('lookDlg'))$('lookDlg').close()});
   Skins.install();
   $('howBtn').addEventListener('click',openSheet);
   $('sheetClose').addEventListener('click',closeSheet);

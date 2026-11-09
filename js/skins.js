@@ -120,7 +120,7 @@ ${T('elephants',{'.strip':`background:${sand};border-color:#b8955a`,'.sq':'backg
 ${T('boxcars',{'.strip':'background:repeating-linear-gradient(90deg,#6b4a2b 0 6px,transparent 6px 16px) 0 50%/100% 70% no-repeat,linear-gradient(#a6a6a6,#a6a6a6) 0 34%/100% 4px no-repeat,linear-gradient(#a6a6a6,#a6a6a6) 0 66%/100% 4px no-repeat,#b9a98f;gap:0','.sq':'background:transparent',...pieceArt(c=>A.boxcar(c)),'.sq .stone':'width:104%;height:100%'})}
 ${T('sliding',{'.strip':`background:${wood};border-color:#7d5420`,'.sq':'background:rgba(0,0,0,.12);box-shadow:inset 0 2px 4px rgba(0,0,0,.35)','.num':'color:#fff;opacity:.8','.stone.sN':art(A.coin())+DROP,'.sq .stone':'width:86%;height:86%'})}
 ${T('cutthroat',{'':`background:radial-gradient(circle at 30% 20%,#2c3e6b,#0d1430)`,'.star':'background:radial-gradient(circle,#1c2a52,#0f1736);border-color:#33467a','.sedge':'stroke:#9fb3e6;stroke-width:1.5;stroke-dasharray:3 4','.sv':'fill:transparent;stroke:none','.sv.ok':'stroke:none'})}
-${T('duosudoku',{'':`background:${wood}`,'.sdk-grid':'border-color:#5b3a1e;background:#5b3a1e;box-shadow:0 10px 24px rgba(0,0,0,.35)','.sc':'background:linear-gradient(#fbf7ee,#efe6d2);color:#242424','.sc.b2':'background:#f7ebc6','.sc.b3':'background:#f5dcc3','.sc.g,.sc.o0,.sc.o1':'background:linear-gradient(#fbf7ee,#efe6d2)','.sc.peer':'background:#e8dcc1','.sc.sel':'background:#cfe0f2','.sdk-scores .sdk-score':'background:rgba(255,255,255,.92)','.sdk-setup':'background:rgba(255,255,255,.9)'})}
+${T('duosudoku',{'':`background:${wood}`,'.sdk-grid':'border-color:#5b3a1e;background:#5b3a1e;box-shadow:0 10px 24px rgba(0,0,0,.35)','.sc':'background:var(--skt-cell)','.sc.g':'background:var(--skt-cell);color:var(--skt-g)','.sc.b2':'background:var(--skt-b2)','.sc.b3':'background:var(--skt-b3)','.sc.o0':'background:var(--skt-o0bg)','.sc.o1':'background:var(--skt-o1bg)','.sc.peer':'background:#e8dcc1','.sc.sel':'background:#cfe0f2','.sdk-scores .sdk-score':'background:rgba(255,255,255,.92)','.sdk-setup':'background:rgba(255,255,255,.9)'})}
 ${T('to15',{'':`background:${felt}`,'.card15':`background:${url(A.diamond())} left 9% top 7%/20% auto no-repeat,${url(A.diamond())} right 9% bottom 7%/20% auto no-repeat,linear-gradient(#fff,#f1ede4);color:#b8312f;font-family:Georgia,serif;border:0;box-shadow:0 6px 10px rgba(0,0,0,.35)`,'.card15.taken':'opacity:.15','.hand':'background:rgba(255,255,255,.92)'})}
 `;
   }
@@ -156,13 +156,22 @@ ${T('to15',{'':`background:${felt}`,'.card15':`background:${url(A.diamond())} le
   }
 
   let style=null;
-  const pref={on:true};
+  /* board colours the player can pick (the colours themselves are in css/style.css under body[data-pal]); sw is the
+     swatch the picker shows: a starting number, each player's number, then a ×2 and a ×3 square */
+  const PALETTES=[
+    {id:'calm',name:'Calm',about:'Every number black. Only open bonus squares are tinted.',sw:[['#fff','#242424'],['#fff','#242424'],['#fff','#242424'],'#fbf1d4','#f9e3cf']},
+    {id:'classic',name:'Classic',about:'The original look: each player’s numbers in their colour, bright bonus squares.',sw:[['#fff','#9aa1ab'],['#dbe8f5','#3C7FBC'],['#e2e3e5','#242424'],'#fff6d6','#ffe3c2']},
+    {id:'mint',name:'Mint',about:'Calm, with soft green bonus squares.',sw:[['#fff','#242424'],['#fff','#242424'],['#fff','#242424'],'#e3f3e9','#cdeadb']},
+    {id:'lavender',name:'Lavender',about:'Calm, with soft purple bonus squares.',sw:[['#fff','#242424'],['#fff','#242424'],['#fff','#242424'],'#efe9fa','#e1d6f5']}];
+  const pref={on:true,pal:'calm'};
   try{const v=localStorage.getItem('playtheory.themed');if(v!==null)pref.on=v==='1'}catch(e){}
+  try{const v=localStorage.getItem('playtheory.palette');if(PALETTES.some(p=>p.id===v))pref.pal=v}catch(e){}
   function install(){
     if(!style){style=document.createElement('style');style.id='skins';style.textContent=css();document.head.append(style)}
-    document.body.classList.toggle('themed',pref.on);
+    document.body.classList.toggle('themed',pref.on);document.body.dataset.pal=pref.pal;
     if(!pref.on) document.querySelectorAll('.skin-img').forEach(e=>e.remove());
   }
   function set(on){pref.on=on;try{localStorage.setItem('playtheory.themed',on?'1':'0')}catch(e){}install()}
-  return {install,decorate,set,get on(){return pref.on},css,A};
+  function setPal(id){if(!PALETTES.some(p=>p.id===id))return;pref.pal=id;try{localStorage.setItem('playtheory.palette',id)}catch(e){}install()}
+  return {install,decorate,set,setPal,PALETTES,get on(){return pref.on},get pal(){return pref.pal},css,A};
 })();
