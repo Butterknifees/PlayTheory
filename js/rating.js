@@ -25,9 +25,12 @@ const Rating=(()=>{
   }
   /* each signed-in player posts both ratings to the match (matches/<id>/elo/<side>) */
   async function publish(){
-    if(!Online.on||!uid()) return;
-    try{await load();await db().ref(`matches/${Online.id}/elo/${PC[Online.me]}`).set({rapid:cur('rapid').r,turns:cur('turns').r})}
-    catch(e){console.warn('Could not post the rating.',e)}
+    if(!uid()) return;
+    try{
+      await load();
+      if(S.state&&!S.busy&&document.body.dataset.view==='play') renderPlay(); // your rating beside your name
+      if(Online.on) await db().ref(`matches/${Online.id}/elo/${PC[Online.me]}`).set({rapid:cur('rapid').r,turns:cur('turns').r});
+    }catch(e){console.warn('Could not post the rating.',e)}
   }
   const posted=(p,side)=>{const m=Online.match,e=m&&m.elo&&m.elo[PC[side]];return e&&typeof e[p]==='number'?e[p]:null};
   /* the before-game ratings that go into the state when a game starts; null when the game can't be rated */
@@ -36,9 +39,15 @@ const Rating=(()=>{
     const p=poolOf(s),a=posted(p,0),b=posted(p,1);
     return a!=null&&b!=null?[a,b]:null;
   }
-  /* the rating shown beside a player's name */
+  /* the rating shown beside a player's name: both players' online, and on one screen (or against the computer) your own
+     on blue, the seat a signed-in player's results count for */
   function tag(q,s){
-    if(!Online.on||!s) return null;
+    if(!s) return null;
+    if(!Online.on){
+      if(q!==0||!uid()) return null;
+      const p=poolOf(s),c=cur(p);
+      return el('small',{class:'elo',title:`Your ${POOLS[p].toLowerCase()} rating${c.n<10?' (still settling)':''}`},String(c.r)+(c.n<10?'?':''));
+    }
     const r=s.elo?s.elo[q]:posted(poolOf(s),q);
     return r==null?null:el('small',{class:'elo'},String(r));
   }

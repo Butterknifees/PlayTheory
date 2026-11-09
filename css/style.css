@@ -694,7 +694,8 @@ div.sc{cursor:default}
   .focus .sdk-pads>*{width:100%;max-width:230px}
   .focus .sdk-pads>:first-child{grid-column:1;justify-self:end}
   .focus .sdk-pads>:last-child{grid-column:3;justify-self:start}
-  .focus .sdk-pads.one>*{grid-column:3}
+  .focus .sdk-pads.one>.p0{grid-column:1;justify-self:end} .focus .sdk-pads.one>.p1{grid-column:3;justify-self:start}
+  .focus .sdk-pads.one .sdk-pad{grid-template-columns:repeat(3,minmax(0,1fr));max-width:none}
   .focus .sdk-scores{display:contents}
   .focus .sdk-score{width:100%;max-width:230px}
   .focus .sdk-score.s0{grid-column:1;justify-self:end}
@@ -803,7 +804,7 @@ div.sc{cursor:default}
 .lb-t small{font:500 11px var(--f-mono);color:var(--muted);white-space:nowrap}
 
 /* ================= ratings ================= */
-.sdk-score .elo{font:500 11px var(--f-mono);color:var(--muted);margin-left:6px}
+.sdk-score .elo{font:600 12px var(--f-mono);color:var(--muted);margin-left:6px;padding:1px 6px;border-radius:6px;background:var(--surface-2)}
 .elo-line{margin:4px 0 0!important;font-weight:700}
 .elo-line.fine{font-weight:400}
 .linkish{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--brand-blue);text-decoration:underline;cursor:pointer}

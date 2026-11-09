@@ -104,7 +104,8 @@ const SdkBotPlay=(()=>{
     if(mv.wait) return; // holding back: think again on the next tick (a skip is left to the turn clock)
     if(s.grid[mv.i]){think(s,key,.5);return} // the square went while it was thinking: half the time is already spent
     me={i:mv.i,d:mv.d};
-    ctx.play(sdkPlace(s,mv.i,mv.d,sdkSpent(s),1),null,{silent:true,op:st=>st.grid[mv.i]||st.ended?null:sdkPlace(st,mv.i,mv.d,0,1)});
+    if(ctx.ui.sel===mv.i) delete ctx.ui.sel; // the player's selected square is the one it took; any other selection stays
+    ctx.play(sdkPlace(s,mv.i,mv.d,sdkSpent(s),1),null,{silent:true,keepUi:true,op:st=>st.grid[mv.i]||st.ended?null:sdkPlace(st,mv.i,mv.d,0,1)});
   }
   if(typeof document!=='undefined') setInterval(tick,200);
   return{NAME,rec};

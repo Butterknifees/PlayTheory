@@ -20,7 +20,7 @@ const ctx={
     if(!opt.silent) Sound.fx(S.game.sfx,{p:mover});
     if(anim){lock(true);try{await anim()}catch(e){console.error(e)}lock(false)}
     if(S.state!==base) return; // the game changed while the animation ran
-    S.hist.push(S.state);S.who.push(mover);S.state=next;S.ui={};
+    S.hist.push(S.state);S.who.push(mover);S.state=next;if(!opt.keepUi)S.ui={}; // keepUi: someone else's move (the computer) leaves your selection alone
     renderPlay(true);
     Online.push('move',opt.op);
     if(S.over) celebrate();
