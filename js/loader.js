@@ -15,12 +15,25 @@ const Loader=(()=>{
     'Sudoku has nothing to do with sums. Letters, colours or shapes would work just as well as the digits 1 to 9.',
     'In Japan, Nikoli owns the name Sudoku, so other Japanese puzzle books call it Nanpure, short for “number place”.'
   ];
-  const MIN=1200,MAX=10000; // long enough to read a fact; never stuck if something fails to load
+  /* a signed-in player is welcomed back with a title that changes every visit (owner, 2026-11-09). The name comes from
+     the account cache account.js keeps in localStorage (pt-account), since Firebase hasn't loaded yet. */
+  const TITLES=['Math Champion','Number Wizard','Sudoku Sensei','Grid Master','Digit Detective','Logic Legend','Puzzle Pro',
+    'Number Ninja','Number Knight','Grid Genius','Sudoku Star','Brain Boss','Number Whisperer','Puzzle Prodigy','Digit Dynamo',
+    'Grid Guru','Logic Ace','Square Shark','Box Boss','Mastermind','Puzzle Champion','Number Navigator','Clue Cracker','Sudoku Superstar'];
+  const MIN=3000,MAX=10000; // long enough to read the screen; never stuck if something fails to load
   const box=document.getElementById('loader'),txt=document.getElementById('ldFact');
   let k=Math.floor(Math.random()*FACTS.length),tick=0,gone=null;
   const wait=ms=>new Promise(ok=>setTimeout(ok,ms));
   const next=()=>{txt.classList.add('swap');setTimeout(()=>{k=(k+1)%FACTS.length;txt.textContent=FACTS[k];txt.classList.remove('swap')},300)};
   if(box&&txt){txt.textContent=FACTS[k];tick=setInterval(next,5000)}
+  try{
+    const a=JSON.parse(localStorage.getItem('pt-account')||'null'),t=+(localStorage.getItem('pt-title')||0)||0;
+    if(box&&a&&a.n){
+      localStorage.setItem('pt-title',String((t+1)%TITLES.length));
+      const hi=document.createElement('p'),b=document.createElement('b');hi.className='ld-hi';b.textContent=TITLES[t%TITLES.length];
+      hi.append('Welcome back, ',b,' '+String(a.n).slice(0,40)+'!');box.querySelector('.ld-brand').after(hi);
+    }
+  }catch(e){}
   const loaded=new Promise(ok=>{if(document.readyState==='complete')ok();else addEventListener('load',ok,{once:true})});
   function hide(){
     if(gone) return gone;
