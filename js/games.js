@@ -705,14 +705,16 @@ function sdkWorth(grid){
   return left.map((x,d)=>d&&x?ranks.indexOf(x)+1:0);
 }
 const sdkValue=(s,d)=>s.scoring==='diff'?sdkWorth(s.grid)[d]:d;
-/* rapid fire (and the daily challenge): after a wrong number that player scores nothing for 15 seconds;
-   s.cold[p] is when the points come back (server time). Take turns has no such pause. */
-const SDK_COLD=15000,sdkCold=(s,p)=>Math.max(0,((s.cold||[])[p]||0)-sdkNow());
+/* rapid fire (and the daily challenge): after a wrong number that player scores nothing for a while: 5 seconds the first
+   time, then 2 more for each mistake after (7, 9, 11…). s.miss[p] counts their mistakes, s.cold[p] is when the points come
+   back (server time). Take turns has no such pause. */
+const sdkColdFor=k=>(3+2*k)*1000,sdkCold=(s,p)=>Math.max(0,((s.cold||[])[p]||0)-sdkNow());
 function sdkPlace(s,i,d,spent,p=s.turn){
   const n=clone(s),ok=s.sol[i]===d,cold=ok&&sdkCold(s,p)>0,pts=ok?cold?0:sdkValue(s,d)*s.boost[i]:-1;
   if(ok){n.grid[i]=d;n.own[i]=p}
-  else if(s.mode!=='turns') (n.cold||(n.cold=[0,0]))[p]=sdkNow()+SDK_COLD;
-  n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n,...(cold?{cold:1}:{})};
+  let wait=0;
+  if(!ok&&s.mode!=='turns'){const k=++(n.miss||(n.miss=[0,0]))[p];wait=sdkColdFor(k);(n.cold||(n.cold=[0,0]))[p]=sdkNow()+wait}
+  n.score[p]+=pts;n.n++;n.last={i,d,ok,p,pts,k:n.n,...(cold?{cold:1}:{}),...(wait?{wait}:{})};
   if(s.mode==='daily'){if(!ok)n.wrong++;else if(!n.grid.includes(0))n.fin=sdkNow();return n} // the clock stops on the last square
   if(s.mode==='rapid'){if(!n.deadline&&n.limit)n.deadline=sdkNow()+n.limit;return n}
   if(n.limit&&spent) n.clock[p]=Math.max(0,n.clock[p]-spent);
@@ -737,12 +739,12 @@ function sdkEffect(l,s){
   else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p:l.p});setTimeout(()=>cell.classList.remove('bad'),600)}
 }
 
-/* a wrong number pops up for the other player: who, which number, where, and the 15 seconds without points */
+/* a wrong number pops up for the other player: who, which number, where, and how long they score nothing */
 function sdkToast(l){
   document.querySelectorAll('.sdk-toast').forEach(e=>e.remove());
   const t=el('div',{class:'sdk-toast t'+l.p,role:'status','aria-live':'polite'},
     el('b',{},`${name(l.p)} played a wrong ${l.d}`),
-    el('span',{},`Row ${(l.i/9|0)+1}, column ${l.i%9+1}. That’s −1 point, and no points for ${name(l.p)} for the next 15 seconds.`));
+    el('span',{},`Row ${(l.i/9|0)+1}, column ${l.i%9+1}. That’s −1 point, and no points for ${name(l.p)} for the next ${(l.wait||5000)/1000} seconds.`));
   t.addEventListener('click',()=>t.remove());
   document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),400)},3200);
 }
@@ -778,11 +780,11 @@ def({id:'duosudoku',name:'Duo Sudoku',kind:'Scoring',sfx:'pop',motif:'tile',isNe
   blurb:'One sudoku, two players, bonus squares. Race each other in rapid fire, or take turns.',
   rules:s=>s&&s.mode==='daily'?['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     'Daily challenge: everyone gets the same puzzle and the same bonus squares each day, and a new one comes at midnight IST. Play it with a friend on one screen or on two devices.',
-    'It plays like rapid fire with no game clock: both of you place numbers at once until the board is full. Scoring is by difficulty, ×2 and ×3 squares multiply, a wrong number costs the player who placed it 1 point, and for the next 15 seconds that player scores nothing for the squares they fill.',
+    'It plays like rapid fire with no game clock: both of you place numbers at once until the board is full. Scoring is by difficulty, ×2 and ×3 squares multiply, a wrong number costs the player who placed it 1 point, and that player then scores nothing for the squares they fill for 5 seconds, 2 seconds longer with each mistake after (7, 9, 11…).',
     'The clock starts when you tap Start the clock and stops when the last square is filled. Every wrong number, by either of you, adds 10 seconds to your pair’s time on the daily leaderboard. Only your first finished game each day counts; play again for practice.']:['The board is an ordinary sudoku: every row, column and 3×3 box must end up holding 1 to 9 once each.',
     !s||s.scoring==='diff'
-      ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for the next 15 seconds. You can also choose number value scoring, where a correct number scores its own value.'
-      :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for the next 15 seconds. You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
+      ?'Scoring by difficulty (the default): numbers with more copies still to place are worth more. They are ranked by how many are left, from 1 point for the fewest upward, and numbers with the same count left are worth the same. Values change as the board fills, and the strip above the board shows them. On a ×2 or ×3 square a number scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for 5 seconds, and each mistake after that adds 2 seconds (7, 9, 11…). You can also choose number value scoring, where a correct number scores its own value.'
+      :'A correct number scores its value. On a ×2 or ×3 square it scores double or triple. A wrong number costs the player who placed it 1 point, and the square stays empty. In rapid fire, that player then scores nothing for the squares they fill for 5 seconds, and each mistake after that adds 2 seconds (7, 9, 11…). You can also choose scoring by difficulty, where the numbers with the most copies left are worth the most.',
     'Rapid fire (the default): no turns. Both players place numbers as fast as they like until the board is full or the game clock ends (3, 5 or 10 minutes; 10 is the default).',
     'Take turns: players place one number each in turn. A turn lasts at most 30 seconds, then it passes to the other player. You can also give each player a 3 or 5 minute clock; when yours runs out, your opponent plays on alone.'],
   win:s=>s&&s.mode==='daily'?'When the board is full, the higher score wins, and the fastest pairs of the day top the leaderboard.':'When the board is full or time is up, the higher score wins. A tie is possible.',
