@@ -384,6 +384,9 @@ function applyNames(){
   renderInfo();if(S.state&&!S.busy)renderPlay();
 }
 function askNames(join){
+  /* signed in with Google last time: we already know who you are (the opponent is chosen on the game's own screen) */
+  const known=Account.savedName();
+  if(known){S.me=known;S.opp='';S.remote=false;applyNames();return Promise.resolve()}
   return new Promise(done=>{
     const d=$('nameDlg'),f=$('nameForm');let away=true;
     const field=ph=>el('input',{class:'name-in',maxlength:'16',autocomplete:'off',placeholder:ph,'aria-label':ph,enterkeyhint:'next'});

@@ -878,7 +878,14 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
         Online.end();S.state={...clone(S.state),vs:0,bot:0};S.ui={};renderPlay(true);
       });
       const who=sdkOnline()?(Online.friend?`${name(1-Online.me)}, online`:'A friend online (waiting for them to join)'):s.bot?'The computer':'A friend on this screen';
-      const rows=[row('Playing',el('span',{class:'sdk-vs'},who),change),row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
+      /* a friend on this screen: their name here, so nobody has to fill it in up top */
+      let them=null;
+      if(!sdkOnline()&&!s.bot){
+        const inp=el('input',{class:'name-in sdk-them',maxlength:'16',autocomplete:'off',placeholder:'Their name','aria-label':'Their name',value:S.names[1]||''});
+        inp.addEventListener('input',()=>{S.names[1]=S.opp=inp.value;$('nameR').value=inp.value;renderInfo()});
+        them=row('Their name',inp);
+      }
+      const rows=[row('Playing',el('span',{class:'sdk-vs'},who),change),them,row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
       rows.push(row('Scoring',pick2('By difficulty',s.scoring==='diff',{scoring:'diff'}),pick2('Number value',s.scoring!=='diff',{scoring:'number'})));
       const waitFriend=sdkOnline()&&!Online.friend;
       const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':'Start game');

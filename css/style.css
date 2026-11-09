@@ -977,3 +977,4 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .sdk-pick small{color:var(--muted);font-size:14px;line-height:1.35}
 .sdk-join{text-align:center;margin:2px 0 0}
 .sdk-vs{font-weight:700}
+.sdk-them{max-width:180px;padding:7px 10px;font-size:15px}
