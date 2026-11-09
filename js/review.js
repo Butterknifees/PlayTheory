@@ -32,7 +32,8 @@ const Review=(()=>{
       const worth=s.scoring==='diff'?sdkWorth(g):null,val=c=>(worth?worth[s.sol[c]]:s.sol[c])*s.boost[c],can=findable(g);
       let best=0,bonus=0;can.forEach(c=>{const v=val(c);if(v>best)best=v;if(s.boost[c]>1&&v>bonus)bonus=v});
       const mine=ok?val(i):0;if(mine>best)best=mine;
-      const kind=!ok?'mistake':cold?'wasted':mine>=best?'best':bonus>mine?'missed':'good';
+      /* Missed bonus only when a ×2 or ×3 square was the best move on the board and this one was worth under half of it */
+      const kind=!ok?'mistake':cold?'wasted':mine>=best?'best':bonus>=best&&mine*2<bonus?'missed':'good';
       if(!ok) miss[p]++;
       moves.push({k,i,d,p,ok:!!ok,pts:got,t:t-t0,kind,best,mine,think:Math.max(0,t-(s.mode==='turns'?lastAny:lastOwn[p])),
         stage:filled<empty/3?0:filled<empty*2/3?1:2,hard:!!ok&&!can.has(i),sol:s.sol[i],boost:s.boost[i],
@@ -53,7 +54,7 @@ const Review=(()=>{
     const th=m.map(x=>x.think),avg=th.length?th.reduce((t,v)=>t+v,0)/th.length:0;
     let fast=null;for(let j=0;j+4<right.length;j++){const span=right[j+4].t-right[j].t+right[j].think;if(fast==null||span<fast)fast=span}
     const stage=[0,1,2].map(g=>{const x=m.filter(y=>y.stage===g);return x.length?x.reduce((t,y)=>t+y.think,0)/x.length:null});
-    return {n:m.length,right:right.length,acc:pct(right.length,m.length),pacc:pct(earned,poss),count:n,avg,fast,stuck:th.length?Math.max(...th):0,stage,
+    return {n:m.length,right:right.length,acc:m.length?pct(right.length,m.length):null,pacc:m.length?pct(earned,poss):null,count:n,avg,fast,stuck:th.length?Math.max(...th):0,stage,
       hard:m.filter(x=>x.hard).length,lateMiss:m.filter(x=>!x.ok&&x.stage===2).length,
       early:(()=>{const e=m.filter(x=>x.stage===0&&x.ok);return e.length>=3?e.reduce((t,x)=>t+x.mine,0)/Math.max(1,e.reduce((t,x)=>t+x.best,0)):1})()};
   }
@@ -155,7 +156,7 @@ const Review=(()=>{
   function card(p){
     const x=A.st[p];
     return el('div',{class:'rv-card p'+p},el('div',{class:'rv-who'},el('span',{class:'rv-dot p'+p}),el('b',{},name(p)),el('span',{class:'rv-fin'},String(A.s.score[p]))),
-      el('div',{class:'rv-acc'},el('div',{},el('b',{},x.acc+'%'),el('small',{},'Right')),el('div',{},el('b',{},x.pacc+'%'),el('small',{},'Points accuracy'))),
+      el('div',{class:'rv-acc'},el('div',{},el('b',{},x.acc==null?'–':x.acc+'%'),el('small',{},'Right')),el('div',{},el('b',{},x.pacc==null?'–':x.pacc+'%'),el('small',{},'Points accuracy'))),
       el('div',{class:'rv-tags'},...Object.keys(LABEL).map(k=>el('span',{class:'rv-tag '+k,title:ABOUT[k]},`${x.count[k]} ${LABEL[k]}`))));
   }
   function speed(){
@@ -215,7 +216,9 @@ const Review=(()=>{
     if(reduceMotion()) screen(); else intro();
   }
   function close(){clearInterval(introT);clearTimeout(introT);stopPlay();const dl=$('reviewDlg');if(dl.open){try{dl.close()}catch(e){dl.removeAttribute('open')}}}
-  const can=s=>!!(s&&S.gid==='duosudoku'&&s.log&&s.log.length);
+  /* only a complete move list can be reviewed: its points must add up to the final score (a player on an older version of
+     the site plays without recording moves, and the review would be wrong) */
+  const can=s=>!!(s&&S.gid==='duosudoku'&&s.log&&s.log.length&&[0,1].every(p=>s.log.reduce((t,x)=>t+(x[2]===p?x[4]:0),0)===s.score[p]));
   function init(){
     const dl=$('reviewDlg');
     dl.addEventListener('close',()=>{clearInterval(introT);clearTimeout(introT);stopPlay()});

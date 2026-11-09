@@ -17,6 +17,9 @@ const Online=(()=>{
   const CODE_TTL=24*60*60*1000; // room codes stop working after a day (database.rules.json says the same)
   const ID_CHARS='abcdefghijkmnpqrstuvwxyz23456789',CODE_CHARS='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const st={on:false,me:0};
+  /* this page's version (the ?v= on this script); each snapshot carries it, so a friend on an older copy is asked to refresh */
+  const BUILD=(()=>{const c=document.currentScript,m=c&&/[?&]v=(\d+)/.exec(c.src);return m?+m[1]:0})();
+  let newer=false;
   let db=null,uid=null,ref=null,id=null,seq=0,lastTok=null,lastData=null,offset=0,applying=false,fresh=false,match=null,sdkP=null,nameT=null,replayT=null,err='',busyMsg='',mode='link',codeDraft='';
   const configured=()=>typeof FIREBASE_CONFIG!=='undefined'&&!!FIREBASE_CONFIG&&!!FIREBASE_CONFIG.apiKey;
   const other=()=>1-st.me;
@@ -43,7 +46,7 @@ const Online=(()=>{
     return sdkP;
   }
   const denied=e=>/permission.denied/i.test((e&&(e.code||e.message))||'');
-  const snap=()=>JSON.stringify({gid:S.gid,state:S.state,hist:S.hist.slice(-60),who:S.who.slice(-60),starter:S.starter});
+  const snap=()=>JSON.stringify({b:BUILD,gid:S.gid,state:S.state,hist:S.hist.slice(-60),who:S.who.slice(-60),starter:S.starter});
 
   /* ---------- making and accepting a challenge ---------- */
   const rand=(chars,n)=>Array.from({length:n},()=>chars[R(0,chars.length-1)]).join('');
@@ -166,6 +169,7 @@ const Online=(()=>{
   }
   function apply(r){
     let d;try{d=JSON.parse(r.snap)}catch(e){return}
+    if(d.b>BUILD&&!newer){newer=true;bar()} // the friend's PlayTheory is newer than this page
     const g=GAMES.find(x=>x.id===d.gid);if(!g||!playable(g.id)) return;
     applying=true;
     try{
@@ -222,8 +226,11 @@ const Online=(()=>{
     const status=!friendJoined()?(code?`Waiting for your friend · Room ${code}`:'Waiting for your friend to open the link'):friendHere()?`${them} is here`:`${them} is away`;
     const inv=el('button',{class:'btn small',type:'button'},friendJoined()?'Match':'Invite');inv.addEventListener('click',open);
     nb.className='netbar'+(friendHere()?' here':'');
+    /* refreshing keeps the match: the link (?vs=) is in the address bar, so the page joins it again */
+    const up=newer?el('button',{class:'btn small primary',type:'button',title:'Your friend has a newer PlayTheory. Refresh to get it; the match carries on.'},'Update'):null;
+    if(up) up.addEventListener('click',()=>location.reload());
     nb.replaceChildren(el('span',{class:'live-dot','aria-hidden':'true'}),
-      el('span',{class:'nb-text'},el('b',{},`You play ${CNAME[PC[st.me]]}`),el('span',{},status)),inv);
+      el('span',{class:'nb-text'},el('b',{},`You play ${CNAME[PC[st.me]]}`),el('span',{},newer?'PlayTheory was updated. Refresh to match your friend.':status)),...(up?[up]:[]),inv);
     if($('onlineDlg').open) panel();
   }
   function note(m){err=m;if(!$('onlineDlg').open) open();else panel()}
