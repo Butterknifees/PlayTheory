@@ -739,28 +739,31 @@ function sdkEffect(l,s){
   if(!l||l.i==null){if(l&&(l.skip!=null||l.timeout!=null))Sound.fx('bell');return}
   const cell=document.querySelector(`#board .sc[data-i="${l.i}"]`);if(!cell)return;
   cell.append(el('span',{class:'sdk-float'+(l.ok?' f'+l.p:' bad')+(l.cold?' cold':'')},l.ok?'+'+l.pts:daily?'−1 · +10 s':'−1'));
-  if(!l.ok){cell.append(el('span',{class:'sdk-wrongd'},String(l.d)));if(s.mode!=='turns'&&(!sdkOnline()||l.p!==Online.me))sdkToast(l);sdkTint(s)}
+  if(!l.ok){cell.append(el('span',{class:'sdk-wrongd'},String(l.d)));if(s.mode!=='turns')sdkToast(l,sdkMine(s,l.p));sdkTint(s)}
   if(l.ok){Sound.fx(l.pts>l.d?'coin':'pop',{p:l.p});FX.burstAt(cell,[FX.color(PC[l.p]),'#ffd27a','#ffffff'],l.pts>l.d?34:16,{speed:l.pts>l.d?190:120})}
   else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p:l.p});setTimeout(()=>cell.classList.remove('bad'),600)}
 }
 
 /* a wrong number pops up for the other player: who, which number, where, and how long they score nothing */
-/* it sits right over the middle of the board for 0.8 s, then fades (owner, 2026-11-09) */
-function sdkToast(l){
+/* whose mistakes count as "yours" on this screen: your seat online, blue against the computer, both on one shared screen */
+const sdkMine=(s,p)=>sdkOnline()?p===Online.me:s.bot?p===0:true;
+/* a wrong number (owner, 2026-11-09): the one who made it sees it right over the middle of the board for 0.8 s; the other
+   player gets it at the top of the screen instead */
+function sdkToast(l,mine){
   document.querySelectorAll('.sdk-toast').forEach(e=>e.remove());
-  const t=el('div',{class:'sdk-toast t'+l.p,role:'status','aria-live':'polite'},
-    el('b',{},`${name(l.p)} played a wrong ${l.d}`),
+  const you=mine&&(sdkOnline()||S.state&&S.state.bot);
+  const t=el('div',{class:'sdk-toast t'+l.p+(mine?' over':''),role:'status','aria-live':'polite'},
+    el('b',{},`${you?'You':name(l.p)} played a wrong ${l.d}`),
     el('span',{},`Row ${(l.i/9|0)+1}, column ${l.i%9+1}. −1 point, and no points for ${(l.wait||5000)/1000} seconds.`));
-  const g=document.querySelector('#board .sdk-grid'),r=g&&g.getBoundingClientRect();
+  const g=mine&&document.querySelector('#board .sdk-grid'),r=g&&g.getBoundingClientRect();
   if(r&&r.width){t.style.left=r.left+r.width/2+'px';t.style.top=r.top+r.height/2+'px'}
   t.addEventListener('click',()=>t.remove());
-  document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350)},800);
+  document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350)},mine?800:2500);
 }
-/* a soft orange tint over the whole screen while a no-points pause runs: your own online, yours against the computer,
-   either player's on one shared screen */
+/* the one who made the mistake: the whole screen glows red, blinking, until their no-points pause ends */
 function sdkTint(s){
   const on=!!s&&typeof S!=='undefined'&&S.gid==='duosudoku'&&!S.over&&s.mode!=='turns'&&document.body.dataset.view==='play'&&
-    (sdkOnline()?[Online.me]:s.bot?[0]:[0,1]).some(p=>sdkCold(s,p)>0);
+    [0,1].some(p=>sdkMine(s,p)&&sdkCold(s,p)>0);
   let t=document.getElementById('coldTint');
   if(on&&!t){t=el('div',{id:'coldTint','aria-hidden':'true'});document.body.append(t)}
   if(t) t.classList.toggle('on',on);

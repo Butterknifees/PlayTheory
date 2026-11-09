@@ -839,12 +839,15 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .sdk-toast{position:fixed;left:50%;top:max(16px,env(safe-area-inset-top));transform:translateX(-50%);z-index:60;width:min(420px,calc(100vw - 32px));display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-radius:12px;background:var(--surface);border:2px solid #c0392b;box-shadow:0 12px 32px rgba(0,0,0,.22);cursor:pointer;animation:toastin .25s ease-out}
 .sdk-toast b{font:800 17px var(--f-display);color:#b3261e}
 .sdk-toast span{font-size:14px;color:var(--ink)}
-.sdk-toast{top:50%;transform:translate(-50%,-50%);animation:toastin .18s cubic-bezier(.2,1.3,.4,1) both;text-align:center;border-width:3px;box-shadow:0 18px 50px rgba(120,30,20,.35)}
+/* your own mistake: right over the middle of the board (sdkToast in js/games.js); someone else's stays at the top */
+.sdk-toast.over{top:50%;transform:translate(-50%,-50%);animation:toastin .18s cubic-bezier(.2,1.3,.4,1) both;text-align:center;border-width:3px;box-shadow:0 18px 50px rgba(120,30,20,.35)}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,-50%) scale(.85)}}
-.sdk-toast.out{opacity:0;transform:translate(-50%,-50%) scale(.96);transition:opacity .3s,transform .3s}
-/* the no-points pause: the whole screen goes a little orange until it ends (sdkTint in js/games.js) */
-#coldTint{position:fixed;inset:0;z-index:55;pointer-events:none;background:rgba(255,140,30,.13);box-shadow:inset 0 0 120px rgba(255,120,0,.28);opacity:0;transition:opacity .35s}
-#coldTint.on{opacity:1}
+.sdk-toast.over.out{opacity:0;transform:translate(-50%,-50%) scale(.96);transition:opacity .3s,transform .3s}
+/* your no-points pause: the whole screen glows red and blinks until it ends (sdkTint) */
+#coldTint{position:fixed;inset:0;z-index:55;pointer-events:none;background:rgba(220,40,30,.09);box-shadow:inset 0 0 160px rgba(215,30,20,.5);opacity:0;transition:opacity .3s}
+#coldTint.on{opacity:1;animation:coldblink 1s ease-in-out infinite}
+@keyframes coldblink{50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){#coldTint.on{animation:none;opacity:.7}}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,-12px)}}
 
 /* the end card: sits over the board when a game ends (resultCard in js/app.js) */
