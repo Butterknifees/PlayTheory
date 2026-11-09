@@ -714,7 +714,7 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
   .focus .sdk-score{width:100%;max-width:230px}
   .focus .sdk-score.s0{grid-column:1;justify-self:end}
   .focus .sdk-score.s1{grid-column:3;justify-self:start}
-  .focus .sdk>.sdk-gclock,.focus .sdk>.sdk-drow,.focus .sdk>.sdk-turnbar{grid-column:2}
+  .focus .sdk>.sdk-gclock,.focus .sdk>.sdk-crow,.focus .sdk>.sdk-drow,.focus .sdk>.sdk-turnbar{grid-column:2}
   .focus .sdk-worth{max-width:calc(var(--sk)*9 + 6px)}
   .focus .play{padding-top:10px}
   .focus .play .focus-exit{position:absolute;bottom:14px;left:14px;z-index:2}
@@ -828,14 +828,23 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .linkish{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--brand-blue);text-decoration:underline;cursor:pointer}
 
 /* ================= wrong numbers: the pop-up and the 15 seconds without points ================= */
-.sdk-cold{display:inline-block;margin-left:6px;font:500 10.5px var(--f-mono);color:#b3261e;background:#fdecea;border-radius:6px;padding:1px 5px;vertical-align:1px}
+.sdk-crow{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.sdk-cold{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:12px;background:#ff8a1f;color:#fff;font:800 15px var(--f-display);box-shadow:0 3px 0 #c9620a;animation:coldpulse 1s ease-in-out infinite}
+.sdk-cold .dot{width:10px;height:10px;border-radius:50%;border:2px solid #fff;background:var(--left)} .sdk-cold.c1 .dot{background:var(--right)}
+@keyframes coldpulse{50%{transform:scale(1.05)}}
+.demo-box .sdk-cold,.gprev .sdk-cold{display:none}
 .sdk-float.cold{color:var(--muted)}
 .sdk-wrongd{position:absolute;inset:0;display:grid;place-items:center;font:900 calc(var(--sk)*.52) var(--f-display);color:#c0392b;text-decoration:line-through;pointer-events:none;animation:wrongd 1.6s ease-out forwards}
 @keyframes wrongd{0%,70%{opacity:1}100%{opacity:0}}
 .sdk-toast{position:fixed;left:50%;top:max(16px,env(safe-area-inset-top));transform:translateX(-50%);z-index:60;width:min(420px,calc(100vw - 32px));display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-radius:12px;background:var(--surface);border:2px solid #c0392b;box-shadow:0 12px 32px rgba(0,0,0,.22);cursor:pointer;animation:toastin .25s ease-out}
 .sdk-toast b{font:800 17px var(--f-display);color:#b3261e}
 .sdk-toast span{font-size:14px;color:var(--ink)}
-.sdk-toast.out{opacity:0;transform:translate(-50%,-12px);transition:opacity .35s,transform .35s}
+.sdk-toast{top:50%;transform:translate(-50%,-50%);animation:toastin .18s cubic-bezier(.2,1.3,.4,1) both;text-align:center;border-width:3px;box-shadow:0 18px 50px rgba(120,30,20,.35)}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,-50%) scale(.85)}}
+.sdk-toast.out{opacity:0;transform:translate(-50%,-50%) scale(.96);transition:opacity .3s,transform .3s}
+/* the no-points pause: the whole screen goes a little orange until it ends (sdkTint in js/games.js) */
+#coldTint{position:fixed;inset:0;z-index:55;pointer-events:none;background:rgba(255,140,30,.13);box-shadow:inset 0 0 120px rgba(255,120,0,.28);opacity:0;transition:opacity .35s}
+#coldTint.on{opacity:1}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,-12px)}}
 
 /* the end card: sits over the board when a game ends (resultCard in js/app.js) */

@@ -739,19 +739,31 @@ function sdkEffect(l,s){
   if(!l||l.i==null){if(l&&(l.skip!=null||l.timeout!=null))Sound.fx('bell');return}
   const cell=document.querySelector(`#board .sc[data-i="${l.i}"]`);if(!cell)return;
   cell.append(el('span',{class:'sdk-float'+(l.ok?' f'+l.p:' bad')+(l.cold?' cold':'')},l.ok?'+'+l.pts:daily?'−1 · +10 s':'−1'));
-  if(!l.ok){cell.append(el('span',{class:'sdk-wrongd'},String(l.d)));if(s.mode!=='turns'&&(!sdkOnline()||l.p!==Online.me))sdkToast(l)}
+  if(!l.ok){cell.append(el('span',{class:'sdk-wrongd'},String(l.d)));if(s.mode!=='turns'&&(!sdkOnline()||l.p!==Online.me))sdkToast(l);sdkTint(s)}
   if(l.ok){Sound.fx(l.pts>l.d?'coin':'pop',{p:l.p});FX.burstAt(cell,[FX.color(PC[l.p]),'#ffd27a','#ffffff'],l.pts>l.d?34:16,{speed:l.pts>l.d?190:120})}
   else{cell.classList.add('bad');FX.shake(cell);Sound.fx('knock',{p:l.p});setTimeout(()=>cell.classList.remove('bad'),600)}
 }
 
 /* a wrong number pops up for the other player: who, which number, where, and how long they score nothing */
+/* it sits right over the middle of the board for 0.8 s, then fades (owner, 2026-11-09) */
 function sdkToast(l){
   document.querySelectorAll('.sdk-toast').forEach(e=>e.remove());
   const t=el('div',{class:'sdk-toast t'+l.p,role:'status','aria-live':'polite'},
     el('b',{},`${name(l.p)} played a wrong ${l.d}`),
-    el('span',{},`Row ${(l.i/9|0)+1}, column ${l.i%9+1}. That’s −1 point, and no points for ${name(l.p)} for the next ${(l.wait||5000)/1000} seconds.`));
+    el('span',{},`Row ${(l.i/9|0)+1}, column ${l.i%9+1}. −1 point, and no points for ${(l.wait||5000)/1000} seconds.`));
+  const g=document.querySelector('#board .sdk-grid'),r=g&&g.getBoundingClientRect();
+  if(r&&r.width){t.style.left=r.left+r.width/2+'px';t.style.top=r.top+r.height/2+'px'}
   t.addEventListener('click',()=>t.remove());
-  document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),400)},3200);
+  document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350)},800);
+}
+/* a soft orange tint over the whole screen while a no-points pause runs: your own online, yours against the computer,
+   either player's on one shared screen */
+function sdkTint(s){
+  const on=!!s&&typeof S!=='undefined'&&S.gid==='duosudoku'&&!S.over&&s.mode!=='turns'&&document.body.dataset.view==='play'&&
+    (sdkOnline()?[Online.me]:s.bot?[0]:[0,1]).some(p=>sdkCold(s,p)>0);
+  let t=document.getElementById('coldTint');
+  if(on&&!t){t=el('div',{id:'coldTint','aria-hidden':'true'});document.body.append(t)}
+  if(t) t.classList.toggle('on',on);
 }
 
 /* the daily challenge set-up: choose who you're playing first, on this screen or on another device, then start the clock */
@@ -898,12 +910,16 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
 
     /* scores and clocks */
     const pill=q=>el('div',{class:'sdk-score s'+q+(!rapid&&p===q&&!s.out[q]?' on':'')+(s.out[q]?' out':'')},
-      el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&!S.over&&sdkCold(s,q)>0?el('span',{class:'sdk-cold','data-cold':q},`No points ${Math.ceil(sdkCold(s,q)/1000)}s`):null,app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),el('b',{},String(s.score[q])),
+      el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),el('b',{},String(s.score[q])),
       !rapid&&s.limit?el('span',{class:'sdk-clock','data-p':q},s.out[q]?'Time’s up':sdkFmt(s.clock[q]-(app&&started&&q===p?Date.now()-sdkClock.t:0))):null);
     wrap.append(el('div',{class:'sdk-scores'},pill(0),pill(1)));
+    /* the no-points pause counts down right beside the game clock (owner, 2026-11-09), one chip per player in a pause;
+       the tick below keeps them current and hides them when the pause ends */
+    const chips=()=>app&&!S.over?[0,1].map(q=>{const left=sdkCold(s,q);
+      return el('span',{class:'sdk-cold c'+q,'data-cold':q,hidden:left>0?null:''},el('i',{class:'dot'}),el('b',{},`${name(q)}: no points ${Math.ceil(left/1000)}s`))}):[];
     if(daily) wrap.append(el('div',{class:'sdk-drow'},el('div',{class:'sdk-gclock sdk-dclock'},sdkUp(sdkTook(s))),
-      el('div',{class:'sdk-pen'+(s.wrong?' on':'')},`${s.wrong} wrong · +${s.wrong*10} s`)));
-    else if(rapid) wrap.append(el('div',{class:'sdk-gclock'+(s.deadline?'':' idle')},s.deadline?sdkFmt(s.deadline-sdkNow()):`${sdkFmt(s.limit)} · starts with the first number`));
+      el('div',{class:'sdk-pen'+(s.wrong?' on':'')},`${s.wrong} wrong · +${s.wrong*10} s`),...chips()));
+    else if(rapid) wrap.append(el('div',{class:'sdk-crow'},el('div',{class:'sdk-gclock'+(s.deadline?'':' idle')},s.deadline?sdkFmt(s.deadline-sdkNow()):`${sdkFmt(s.limit)} · starts with the first number`),...chips()));
     else if(s.turnLimit&&started) wrap.append(el('div',{class:'sdk-turnbar t'+p},el('div',{class:'trk'},el('i',{style:`--w:${Math.max(0,100-(Date.now()-sdkClock.t)/s.turnLimit*100)}%`})),el('span',{},Math.max(0,Math.ceil((s.turnLimit-(Date.now()-sdkClock.t))/1000))+'s')));
 
     /* by difficulty: what each number is worth right now */
@@ -980,9 +996,10 @@ if(typeof document!=='undefined'){
     const c=b.querySelector(`.sdk-grid .sc[data-i="${j}"]`);if(c)c.focus({preventScroll:true});
   });
   setInterval(()=>{
+    if(typeof S!=='undefined') sdkTint(S.state);
     if(typeof S==='undefined'||S.gid!=='duosudoku'||!S.state||S.over||S.busy) return;
     const s=S.state,fire=()=>{const t=sdkClock.timeout;sdkClock.timeout=null;if(t)t()};
-    document.querySelectorAll('#board .sdk-cold').forEach(e=>{const left=sdkCold(s,+e.dataset.cold);e.textContent=`No points ${Math.ceil(left/1000)}s`;e.hidden=left<=0});
+    document.querySelectorAll('#board .sdk-cold').forEach(e=>{const q=+e.dataset.cold,left=sdkCold(s,q);e.lastChild.textContent=`${name(q)}: no points ${Math.ceil(left/1000)}s`;e.hidden=left<=0});
     if(s.mode==='daily'){if(s.t0&&!s.fin&&!s.ended){document.querySelectorAll('#board .sdk-dclock').forEach(e=>{e.textContent=sdkUp(sdkTook(s))});if(sdkTook(s)>=SDK_DAILY_MAX)fire()}return}
     if(s.mode==='rapid'){
       if(!s.deadline||s.ended) return;
