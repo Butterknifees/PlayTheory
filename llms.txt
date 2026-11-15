@@ -1,6 +1,6 @@
 # PlayTheory
 
-> PlayTheory (playtheoryhq.com, also called PlayTheory HQ) is a free website of two-player strategy games that run in the browser. The game available now is DuSoKu, a two-player sudoku. No sign-up and nothing to install.
+> PlayTheory (playtheoryhq.com, also called PlayTheory HQ) is a free website of two-player strategy games that run in the browser. The games available now are DuSoKu, a two-player sudoku, and Amazons, a board game of moving queens and flaming arrows. Random mode deals one game after another at random and keeps score across the run. No sign-up and nothing to install.
 
 ## DuSoKu
 
@@ -9,6 +9,12 @@
 - The higher score wins when the board is full or the clock runs out. Games last at most 12 minutes.
 - Play side by side on one screen, or online: send a friend a challenge link or a 5-letter room code.
 - Works on phones, tablets and computers in any modern browser.
+
+## Amazons
+
+- Each player has two amazons that move like chess queens, then shoot an arrow that burns a square. Whoever makes the last move wins.
+- A small 5×5 or 6×6 board. Each player has 4 minutes on a chess clock and at most 20 seconds a move; take longer and the turn passes, run out of time and you lose.
+- Play on one screen or online with a link or room code. Online games between signed-in players are rated.
 
 ## Pages
 

@@ -86,15 +86,18 @@ function renderPlay(moved){
   const t=$('turn');t.className='turn t'+s.turn+(moved?' bump':'');
   const free=!!(S.game.anyTurn&&S.game.anyTurn(s)),mine=Online.on&&s.turn===Online.me,waiting=Online.on&&!over&&!mine&&!free;
   t.replaceChildren(...(over?[el('span',{},'Game over')]:[el('span',{class:'dot'}),el('span',{},S.game.status&&S.game.status(s)||(mine?'Your move':`${name(s.turn)} to move`))]));
-  const started=S.hist.length>0;
+  const started=S.hist.length>0,fixed=started||!!(S.game.ready&&S.game.ready(s)); // first move can't change once the clocks run
   $('f0').parentElement.hidden=free;
   t.parentElement.classList.toggle('free',free);
-  [0,1].forEach(p=>{const b=$('f'+p);b.textContent=name(p);b.setAttribute('aria-pressed',String(S.starter===p));b.disabled=started});
+  [0,1].forEach(p=>{const b=$('f'+p);b.textContent=name(p);b.setAttribute('aria-pressed',String(S.starter===p));b.disabled=fixed});
+  /* Random mode: the run's score so far, this game included once it's over */
+  const rb=$('rndBar'),r=s.rnd;rb.hidden=!r;
+  if(r){const run=rndTally(r,over);rb.replaceChildren(el('b',{},'Random mode'),` · Game ${r.k} · `,el('span',{class:'p0'},`${name(0)} ${run.w[0]}`),' – ',el('span',{class:'p1'},`${run.w[1]} ${name(1)}`),run.d?` · ${run.d} drawn`:'')}
   const res=$('result');
   if(over&&resShut!==s) resultCard(res,s,over);
   else if(over){
     const w=over.winner;res.hidden=false;res.className='result'+(w==='draw'?'':' w'+w);
-    const again=el('button',{class:'btn',type:'button'},'Play again');again.addEventListener('click',()=>newPosition(true));
+    const again=el('button',{class:'btn',type:'button'},s.rnd?'Next game':'Play again');again.addEventListener('click',()=>s.rnd?nextRandom():newPosition(true));
     const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Choose another game');nxt.addEventListener('click',goHome);
     const show=el('button',{class:'btn',type:'button'},'Show result');show.addEventListener('click',()=>{resShut=null;renderPlay()});
     if(over.daily) again.textContent='Play again (practice)';
@@ -160,13 +163,17 @@ function resultCard(res,s,over){
   const tiles=g.stats?g.stats(s):[];
   const btn=(t,f,c='btn')=>{const b=el('button',{class:c,type:'button'},t);b.addEventListener('click',f);return b};
   const again=()=>newPosition(true);
-  /* Game review leads, like chess; without a move list (a game from before reviews) the old buttons stay */
+  /* Game review leads, like chess; without a move list (a game from before reviews) the old buttons stay.
+     In Random mode the next game leads, and the run's score sits under the title */
   const rv=typeof Review!=='undefined'&&Review.can(s);
-  const main=rv?btn('Game review',()=>Review.open(s),'btn primary big'):over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn('Play again',again,'btn primary big');
-  const second=over.daily?btn('Play again (practice)',again):typeof Rating!=='undefined'&&S.gid==='duosudoku'?btn('Player rankings',()=>Rating.open()):btn('Look at the board',shut);
-  const third=rv?over.daily?btn('Leaderboard',()=>Daily.open(s.day)):btn('Play again',again):null;
+  const ranks=typeof Rating!=='undefined'&&Rating.rates(S.gid)?btn('Player rankings',()=>Rating.open(Rating.poolOf(s))):null;
+  const main=s.rnd?btn('Next game',nextRandom,'btn primary big'):rv?btn('Game review',()=>Review.open(s),'btn primary big'):over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn('Play again',again,'btn primary big');
+  const second=over.daily?btn('Play again (practice)',again):ranks||btn('Look at the board',shut);
+  const third=rv?s.rnd?btn('Game review',()=>Review.open(s)):over.daily?btn('Leaderboard',()=>Daily.open(s.day)):btn('Play again',again):null;
+  const run=s.rnd?rndTally(s.rnd,over):null;
   res.replaceChildren(el('div',{class:'res-card',role:'dialog','aria-modal':'false','aria-labelledby':'resT'},x,
     el('div',{class:'res-head'},el('h2',{id:'resT'},resTitle(w)),el('p',{},pn(over.how||over.reason))),
+    run?el('p',{class:'res-run'},`Random mode, after ${s.rnd.k} ${s.rnd.k===1?'game':'games'}: `,el('b',{},`${name(0)} ${run.w[0]} – ${run.w[1]} ${name(1)}`),run.d?` (${run.d} drawn)`:''):null,
     elo,
     el('div',{class:'res-coach'},resPose.node,el('p',{class:'res-say'},pn(say))),
     tiles.length?el('div',{class:'res-who'},...[0,1].map(p=>el('span',{class:'p'+p},el('i',{class:'dot'}),name(p)))):null,
@@ -226,17 +233,22 @@ function updateNowPlaying(){
 /* seed: a state hinting which kind of game to deal (the daily challenge passes {mode:'daily'}); a new position keeps the kind */
 function newPosition(animate,dealt,seed){
   Mascot.hide();
-  S.state=S.game.create(dealt?seed:S.state);S.state.turn=S.starter;S.hist=[];S.who=[];S.ui={};S.busy=false;
+  const from=dealt?seed:S.state;
+  S.state=S.game.create(from);if(from&&from.rnd)S.state.rnd=from.rnd;S.state.turn=S.starter;S.hist=[];S.who=[];S.ui={};S.busy=false;
   renderInfo();S.entering=!!animate;renderPlay();
   Demo.start(S.game,$('demoBox'),$('demoCap'));
   if(!dealt) Online.push('new');
 }
 function startGame(id,seed){if(!playable(id)){goHome();return}closeSheet();S.sawHow=false;S.gid=id;S.game=GAMES.find(g=>g.id===id);newPosition(false,true,seed);showIntro();Online.push('game')}
+
+/* Random mode (owner, 2026-11-15): a run of games, each picked at random from the playable ones. Who you're playing is
+   chosen once; s.rnd {w: wins each, d: draws, k: game number} rides along in every game's state, so both devices online
+   keep the same score, and whoever taps Next game deals the next one for both. Who moves first alternates */
+const rndTally=(r,over)=>{const w=[...r.w];let d=r.d;if(over){if(over.winner==='draw')d++;else w[over.winner]++}return{w,d}};
+function startRandom(){S.starter=0;startGame(pick([...PLAYABLE]),{rnd:{w:[0,0],d:0,k:1}});try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}}
 function nextRandom(){
-  if(!S.bag.length) S.bag=shuffle(GAMES.map(g=>g.id).filter(id=>playable(id)&&id!==S.gid));
-  if(!S.bag.length) S.bag=[FEATURED];
-  startGame(S.bag.pop());
-  try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}
+  const s=S.state,r=s&&s.rnd;if(!r) return;
+  S.starter=r.k%2;startGame(pick([...PLAYABLE]),{vs:s.vs||0,rnd:{...rndTally(r,S.over),k:r.k+1}});
 }
 
 /* ---------- home: a card for every game ---------- */
@@ -244,7 +256,7 @@ const FILTERS=[['all','All games'],['new','New'],['Partizan',KIND.Partizan],['Im
 let filter='all',previewObs=null;
 const FEATURED='duosudoku';
 /* only these games are open for now; every other card says Coming soon and cannot be started */
-const PLAYABLE=new Set([FEATURED]);
+const PLAYABLE=new Set([FEATURED,'amazons']);
 const playable=id=>PLAYABLE.has(id);
 function view(v){
   const home=v==='home';
@@ -305,7 +317,19 @@ function buildFeatured(){
     Skins.decorate(g.id,prev);requestAnimationFrame(()=>fitPreview(prev));
   }catch(e){console.error(e)}
 }
+/* the Random mode card, under the daily one */
+function buildRandom(){
+  const box=$('rndCard');if(!box||box.firstChild) return;
+  const go=el('button',{class:'btn primary',type:'button'},'Start Random mode');go.addEventListener('click',()=>{Sound.unlock();startRandom()});
+  const names=GAMES.filter(g=>playable(g.id)).map(g=>g.name).join(' or ');
+  box.replaceChildren(el('div',{class:'daily-txt'},
+    el('div',{class:'gmeta'},el('span',{class:'chip new'},'New'),el('span',{class:'chip'},'A run of games')),
+    el('h3',{},'Random mode'),
+    el('p',{},`Every game is picked at random: ${names}. Choose who you’re playing once, then play game after game and keep score across the run.`)),
+    el('div',{class:'daily-go'},go));
+}
 function buildHome(){
+  buildRandom();
   const f=$('filters');
   f.replaceChildren(...FILTERS.map(([k,label])=>{
     const b=el('button',{class:'fchip',type:'button','aria-pressed':String(k===filter)},label);
@@ -426,13 +450,13 @@ function boot(){
   sel.closest('.pick').hidden=open.length<2;
   $('surprise').hidden=open.length<2;
   sel.addEventListener('change',()=>startGame(sel.value));
-  [0,1].forEach(p=>$('f'+p).addEventListener('click',()=>{if(S.hist.length||S.busy)return;S.starter=p;S.state.turn=p;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first')}));
+  [0,1].forEach(p=>$('f'+p).addEventListener('click',()=>{if(S.hist.length||S.busy||(S.game.ready&&S.game.ready(S.state)))return;S.starter=p;S.state.turn=p;S.ui={};Sound.fx('pick');renderPlay(true);Online.push('first')}));
   $('undo').addEventListener('click',()=>{if(!S.hist.length||S.busy||!Online.mayUndo()||S.game.noUndo)return;S.state=S.hist.pop();S.who.pop();S.ui={};Sound.fx('undo');renderPlay(true);Online.push('undo')});
   $('restart').addEventListener('click',()=>{if(!S.busy)newPosition(true)});
   $('next').addEventListener('click',goHome);
   $('homeBtn').addEventListener('click',goHome);
-  $('focusExit').addEventListener('click',()=>{if(confirm('Leave this game? The scores so far will be lost.'))goHome()});
-  $('surprise').addEventListener('click',()=>{Sound.unlock();nextRandom()});
+  $('focusExit').addEventListener('click',()=>{if(confirm(S.state&&S.state.rnd?'Leave Random mode? The score of this run will be lost.':'Leave this game? The scores so far will be lost.'))goHome()});
+  $('surprise').addEventListener('click',()=>{Sound.unlock();startRandom()});
   $('musicBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('music',!Sound.pref.music);if(Sound.pref.music&&$('intro').hidden)Music.play(S.gid);else if(!Sound.pref.music)Music.stop();updateNowPlaying()}));
   $('sfxBtn').addEventListener('click',()=>Sound.unlock().then(()=>{Sound.setPref('sfx',!Sound.pref.sfx);Sound.fx('pick');updateNowPlaying()}));
   $('lookBtn').addEventListener('click',()=>{Skins.set(!Skins.on);Sound.fx('pick');updateNowPlaying();if(!S.busy)renderPlay()});

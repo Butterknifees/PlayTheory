@@ -7,12 +7,15 @@
    at 40 points a game and check that the match and the opponent are real, but they can't replay the game, so a determined
    cheater could still fake results (accepted for now; a Cloud Function could do the sums on the server later). */
 const Rating=(()=>{
-  const START=1200,MIN_MOVES=10,POOLS={rapid:'Rapid fire',turns:'Take turns'};
+  /* Amazons has a rating of its own since 2026-11-15 (pool 'amazons'; counts after 6 moves) */
+  const START=1200,POOLS={rapid:'Rapid fire',turns:'Take turns',amazons:'Amazons'},RATED=new Set(['duosudoku','amazons']);
   let mine={},last=null,pool='rapid',lq=null,rows=null,err='',wn=0,nudged=false;
   const done=new Set();
   const db=()=>firebase.database(),T=()=>firebase.database.ServerValue.TIMESTAMP;
   const uid=()=>{const u=window.firebase&&firebase.apps.length&&firebase.auth().currentUser;return u&&!u.isAnonymous?u.uid:null};
-  const poolOf=s=>s.mode==='turns'?'turns':'rapid';
+  const poolOf=s=>S.gid==='amazons'?'amazons':s.mode==='turns'?'turns':'rapid';
+  const minMoves=()=>S.gid==='amazons'?6:10,few=()=>S.gid==='amazons'?'moves were made':'numbers were placed';
+  const low=p=>p==='amazons'?POOLS[p]:POOLS[p].toLowerCase();
   const cur=p=>mine[p]||{r:START,n:0,w:0,l:0,d:0};
   const K=n=>n<10?40:20; // the first 10 games move a rating faster, like a new chess account
   const PITCH={title:'Get your rating',text:'Sign in with Google to get a chess-style rating and a place in the player rankings. Online games against other signed-in players are rated.'};
@@ -29,7 +32,11 @@ const Rating=(()=>{
     try{
       await load();
       if(S.state&&!S.busy&&document.body.dataset.view==='play') renderPlay(); // your rating beside your name
-      if(Online.on) await db().ref(`matches/${Online.id}/elo/${PC[Online.me]}`).set({rapid:cur('rapid').r,turns:cur('turns').r});
+      if(Online.on){
+        const side=db().ref(`matches/${Online.id}/elo/${PC[Online.me]}`);
+        await side.set({rapid:cur('rapid').r,turns:cur('turns').r});
+        side.child('amazons').set(cur('amazons').r).catch(()=>{}); // its own write: database rules from before Amazons refuse it, and that mustn't stop the other two
+      }
     }catch(e){console.warn('Could not post the rating.',e)}
   }
   const posted=(p,side)=>{const m=Online.match,e=m&&m.elo&&m.elo[PC[side]];return e&&typeof e[p]==='number'?e[p]:null};
@@ -46,7 +53,7 @@ const Rating=(()=>{
     if(!Online.on){
       if(q!==0||!uid()) return null;
       const p=poolOf(s),c=cur(p);
-      return el('small',{class:'elo',title:`Your ${POOLS[p].toLowerCase()} rating${c.n<10?' (still settling)':''}`},String(c.r)+(c.n<10?'?':''));
+      return el('small',{class:'elo',title:`Your ${low(p)} rating${c.n<10?' (still settling)':''}`},String(c.r)+(c.n<10?'?':''));
     }
     const r=s.elo?s.elo[q]:posted(poolOf(s),q);
     return r==null?null:el('small',{class:'elo'},String(r));
@@ -54,9 +61,9 @@ const Rating=(()=>{
 
   /* ---------- a finished game ---------- */
   async function result(s,over){
-    if(S.gid!=='duosudoku'||!over) return;
+    if(!RATED.has(S.gid)||!over) return;
     if(!uid()){if(!over.daily)nudge();return} // the daily challenge asks for itself (js/daily.js)
-    if(!Online.on||!s.elo||!s.g||s.n<MIN_MOVES) return;
+    if(!Online.on||!s.elo||!s.g||s.n<minMoves()) return;
     const key=Online.id+'/'+s.g;if(done.has(key)) return;done.add(key);
     const p=poolOf(s),me=Online.me,m=Online.match,u=uid(),opp=me===0?m.guest:m.host;
     try{
@@ -82,13 +89,13 @@ const Rating=(()=>{
   function change(s){const k=Online.on&&s&&s.g?Online.id+'/'+s.g:'';return last&&last.key===k&&!last.err?last:null}
   /* a line for the result box: the rating change, or why there wasn't one */
   function line(s){
-    if(!s||S.gid!=='duosudoku') return null;
+    if(!s||!RATED.has(S.gid)) return null;
     const k=Online.on&&s.g?Online.id+'/'+s.g:'';
     if(last&&last.key===k) return el('p',{class:'elo-line'},last.err?'Could not save your rating this time.':
       `${POOLS[last.p]} rating: ${last.from} → ${last.to} (${last.to>=last.from?'+':''}${last.to-last.from})`);
     if(!uid()){const b=el('button',{class:'linkish',type:'button'},'Sign in to get a rating');b.addEventListener('click',()=>Account.open(null,PITCH));return el('p',{class:'elo-line'},b)}
     if(Online.on&&!s.elo) return el('p',{class:'elo-line fine'},'Not rated: both players need to be signed in when the game starts.');
-    if(Online.on&&s.n<MIN_MOVES) return el('p',{class:'elo-line fine'},`Not rated: fewer than ${MIN_MOVES} numbers were placed.`);
+    if(Online.on&&s.n<minMoves()) return el('p',{class:'elo-line fine'},`Not rated: fewer than ${minMoves()} ${few()}.`);
     return null;
   }
 
@@ -109,8 +116,8 @@ const Rating=(()=>{
     const me=uid(),kids=[];
     const tab=(p)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(pool===p)},POOLS[p]);b.addEventListener('click',()=>{if(pool!==p){pool=p;watch();panel()}});return b};
     kids.push(el('h2',{},'Player rankings'),el('div',{class:'lb-tabs',role:'group','aria-label':'Which rating'},...Object.keys(POOLS).map(tab)),
-      el('p',{class:'fine'},'Ratings work like chess: everyone starts at 1200, a win against a stronger player gains more, and a loss to a weaker one costs more. Online games between two signed-in players count when at least 10 numbers are placed. Daily challenges count as rapid fire.'));
-    if(me){const c=cur(pool);kids.push(el('p',{class:'lb-note'},`Your ${POOLS[pool].toLowerCase()} rating: `,el('b',{},String(c.r)),c.n?` · ${c.n} rated ${c.n===1?'game':'games'}`:' · no rated games yet'))}
+      el('p',{class:'fine'},'Ratings work like chess: everyone starts at 1200, a win against a stronger player gains more, and a loss to a weaker one costs more. Online games between two signed-in players count: DuSoKu when at least 10 numbers are placed (daily challenges count as rapid fire), Amazons when at least 6 moves are made.'));
+    if(me){const c=cur(pool);kids.push(el('p',{class:'lb-note'},`Your ${low(pool)} rating: `,el('b',{},String(c.r)),c.n?` · ${c.n} rated ${c.n===1?'game':'games'}`:' · no rated games yet'))}
     else{const b=el('button',{class:'btn primary',type:'button'},'Sign in to get a rating');b.addEventListener('click',()=>{close();Account.open(()=>open(pool),PITCH)});kids.push(b)}
     if(err) kids.push(el('p',{class:'net-err',role:'alert'},err));
     else if(!rows) kids.push(el('p',{class:'net-wait'},el('span',{class:'spin','aria-hidden':'true'}),'Loading…'));
@@ -137,5 +144,5 @@ const Rating=(()=>{
     $('rankDlg').addEventListener('click',e=>{if(e.target===$('rankDlg'))close()});
     $('rankDlg').addEventListener('close',unwatch);
   }
-  return {init,open,publish,snap,tag,result,line,change,summary,load,PITCH,POOLS};
+  return {init,open,publish,snap,tag,result,line,change,summary,load,PITCH,POOLS,poolOf,rates:id=>RATED.has(id)};
 })();

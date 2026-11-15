@@ -326,21 +326,70 @@ def({id:'konane',name:'Kōnane',kind:'Partizan',sfx:'capture',motif:'disc',
 
 /* ---------------- amazons: move like a queen, then shoot a flaming arrow ---------------- */
 const queenReach=(b,r,c)=>{const N=b.length,out=[];for(const [dr,dc] of Q8){let rr=r+dr,cc=c+dc;while(rr>=0&&cc>=0&&rr<N&&cc<N&&b[rr][cc]===null){out.push([rr,cc]);rr+=dr;cc+=dc}}return out};
-const amazonsShot=(s,from,to,arrow)=>nx(s,n=>{n.b[from[0]][from[1]]=null;n.b[to[0]][to[1]]=PC[s.turn];n.b[arrow[0]][arrow[1]]='X';n.lastArrow=arrow;n.lastAt=Date.now()});
-def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',
+/* the clock (owner, 2026-11-15): 4 minutes each, running only on your own turn, and at most 20 seconds a move. s.at is when
+   the current turn began (server time, sdkNow), so both devices count down from the same moment. Out of time for a move:
+   the turn passes, and the time still comes off your 4 minutes. Out of your 4 minutes: you lose (s.flag = who) */
+const AMZ_CLOCK=240000,AMZ_MOVE=20000;
+const amzUsed=s=>s.set&&s.at?Math.max(0,sdkNow()-s.at):0;
+const amzLeft=(s,q)=>s.clock[q]-(q===s.turn&&s.flag==null?amzUsed(s):0);
+function amzSpend(n,s){if(!s.set||!s.at)return;const p=s.turn;n.clock[p]=Math.max(0,s.clock[p]-amzUsed(s));if(!n.clock[p])n.flag=p;n.at=sdkNow()}
+const amazonsShot=(s,from,to,arrow)=>nx(s,n=>{n.b[from[0]][from[1]]=null;n.b[to[0]][to[1]]=PC[s.turn];n.b[arrow[0]][arrow[1]]='X';n.lastArrow=arrow;n.lastAt=Date.now();n.n=(s.n||0)+1;n.last=null;amzSpend(n,s)});
+function amzSkip(s){const p=s.turn,n=clone(s);amzSpend(n,s);n.skips=(s.skips||0)+1;n.last={skip:p,k:n.skips};if(n.flag==null)n.turn=1-p;return n}
+function amzFlag(s){const n=clone(s);n.clock[s.turn]=0;n.flag=s.turn;n.at=sdkNow();return n}
+/* before the clocks start: who you're playing, then Start game. Online only the player who moves first can start */
+function amzSetup(s,ctx,wrap){
+  const row=(label,...b)=>el('div',{class:'sdk-opt'},el('span',{class:'role'},label),...b);
+  const waitFriend=sdkOnline()&&!Online.friend,waitThem=sdkOnline()&&Online.friend&&s.turn!==Online.me;
+  const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':waitThem?`Waiting for ${name(s.turn)} to start`:'Start game');
+  go.disabled=!ctx.live||waitFriend;
+  go.addEventListener('click',()=>ctx.configure({...clone(s),set:1,at:sdkNow(),start:sdkNow(),elo:sdkElo(s)}));
+  wrap.append(el('div',{class:'sdk-setup big'},el('h3',{},'Set up the game'),...whoRows(s,ctx,row),
+    row('Clock',el('span',{class:'sdk-vs'},'4 minutes each · 20 seconds a move')),
+    el('p',{class:'fine'},`${name(s.turn)} moves first. Your clock runs only on your turn: take longer than 20 seconds and the turn passes, run out of your 4 minutes and you lose.`),go));
+  ctx.say(waitThem?`${name(s.turn)} moves first, so they start the clock.`:'Choose who moves first above, then tap Start game.');
+  return wrap;
+}
+/* during the game: both clocks (yours highlighted on your turn) and the 20-second bar for whoever is to move */
+function amzFrame(s,ctx,g,app){
+  const p=s.turn,over=s.flag!=null||(app&&!!S.over);
+  const pill=q=>el('div',{class:'sdk-score s'+q+(p===q&&!over?' on':'')},
+    el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),
+    el('span',{class:'sdk-clock'+(amzLeft(s,q)<30000?' low':''),'data-p':q},sdkFmt(amzLeft(s,q))));
+  const wrap=el('div',{class:'amz'},el('div',{class:'sdk-scores'},pill(0),pill(1)));
+  if(!over){const left=Math.min(s.turnLimit-amzUsed(s),amzLeft(s,p)),mine=app&&(sdkOnline()?Online.me===p:true);
+    wrap.append(el('div',{class:'sdk-turnbar t'+p+(left<5000?' low':'')},el('b',{class:'amz-who'},sdkOnline()&&mine?'Your move':name(p)),
+      el('div',{class:'trk'},el('i',{style:`--w:${Math.max(0,left/s.turnLimit*100)}%`})),el('span',{},Math.max(0,Math.ceil(left/1000))+'s')))}
+  wrap.append(g);
+  /* a skipped turn pops up once (not one that happened before this page saw the game) */
+  if(app){if(s.last&&s.last.skip!=null){const k=s.g+':'+s.last.k;if(k!==amzSeen){const seen=amzSeen!=='';amzSeen=k;if(seen)setTimeout(()=>amzToast(s.last.skip),0)}}else amzSeen='-'}
+  return wrap;
+}
+let amzSeen='';
+function amzToast(q){
+  document.querySelectorAll('.sdk-toast').forEach(e=>e.remove());Sound.fx('bell');
+  const t=el('div',{class:'sdk-toast t'+q,role:'status','aria-live':'polite'},el('b',{},`${name(q)} ran out of time for that move`),el('span',{},`The turn passed to ${name(1-q)}.`));
+  t.addEventListener('click',()=>t.remove());document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350)},2500);
+}
+def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',isNew:true,noUndo:true,
   blurb:'Queens move, then fire flaming arrows that burn the board. The space shrinks with every turn.',solved:'no',
-  rules:['Each player has two amazons. They move like chess queens: any distance in a straight or diagonal line.','On your turn, move one of your amazons, then she draws her bow and shoots a flaming arrow from her new square. The arrow also travels like a queen.','The arrow sets its square on fire. Nothing may move onto or through burned squares or other amazons.','Whoever makes the last move wins.'],
+  rules:['Each player has two amazons. They move like chess queens: any distance in a straight or diagonal line.','On your turn, move one of your amazons, then she draws her bow and shoots a flaming arrow from her new square. The arrow also travels like a queen.','The arrow sets its square on fire. Nothing may move onto or through burned squares or other amazons.','Whoever makes the last move wins.',
+    'The clock: each player has 4 minutes, which run only on their own turn. Each move must be made within 20 seconds. If it isn’t, the turn passes to the other player, and the time still comes off your 4 minutes. Run out of your 4 minutes and you lose.'],
+  win:'If it is your turn and you have no legal move, you lose. Running out of your 4 minutes also loses.',
   how:'Click one of your amazons, click where she should move, then click where to shoot the arrow.',
-  create:()=>{const N=pick([5,6]),b=Array.from({length:N},()=>Array(N).fill(null));
+  create:prev=>{const N=pick([5,6]),b=Array.from({length:N},()=>Array(N).fill(null));
     const a=N===5?[1,3]:[1,4];a.forEach(c=>{b[0][c]='L';b[N-1][c]='R'});
     for(let k=R(0,2);k>0;k--){const r=R(1,N-2),c=R(0,N-1);if(b[r][c]===null){b[r][c]='X';if(b[N-1-r][N-1-c]===null)b[N-1-r][N-1-c]='X'}}
-    return{b}},
+    return{b,g:sdkGameId(),set:0,vs:prev&&prev.vs||0,clock:[AMZ_CLOCK,AMZ_CLOCK],turnLimit:AMZ_MOVE,at:0,n:0,skips:0}},
   moves:s=>{const out=[],b=s.b;
     b.forEach((row,r)=>row.forEach((v,c)=>{if(v!==PC[s.turn])return;
       queenReach(b,r,c).forEach(to=>{const bd=clone(b);bd[r][c]=null;bd[to[0]][to[1]]=v;queenReach(bd,to[0],to[1]).forEach(ar=>out.push(amazonsShot(s,[r,c],to,ar)))})}));
     return out},
   hasMove:(s,p)=>s.b.some((row,r)=>row.some((v,c)=>v===PC[p]&&queenReach(s.b,r,c).length)),
+  ready:s=>!!s.set,
+  result:s=>s.flag!=null?{winner:1-s.flag,reason:`${name(s.flag)} ran out of time.`,how:`${name(s.flag)} ran out of time`}:null,
   render(s,ctx){
+    const app=typeof ctx.configure==='function';
+    if(app&&!s.set){const wrap=el('div',{class:'amz'});return !s.vs&&!sdkOnline()?pickWho(s,ctx,wrap,{here:'Two players taking turns on this screen.'}):amzSetup(s,ctx,wrap)}
     const p=s.turn,b=s.b,N=b.length,u=ctx.ui;
     let bd=b,targets=[],phase=0;
     if(u.sel&&!u.dest){phase=1;targets=queenReach(b,u.sel[0],u.sel[1])}
@@ -383,7 +432,8 @@ def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',
       g.append(cell);
     }
     ctx.say(phase===1?'Click a highlighted square to move there, or click the amazon again to pick the other one.':phase===2?'Now aim: click a square the flaming arrow can reach from her new square. Click her to take the move back.':null);
-    return g;
+    /* previews and the demo show just the board; a game in play gets its clocks */
+    return s.set?amzFrame(s,ctx,g,app):g;
   }});
 
 /* ---------------- graph colouring ---------------- */
@@ -770,21 +820,44 @@ function sdkTint(s){
 }
 
 /* the daily challenge set-up: choose who you're playing first, on this screen or on another device, then start the clock */
-/* the first screen, like a chess site's Play page: who are you playing? Then the settings (render) */
-function sdkChooser(s,ctx,wrap){
+/* the first screen, like a chess site's Play page: who are you playing? Then the settings (render).
+   Shared with Amazons; o.bot and o.daily add those cards, o.here is the line under Play a friend here.
+   In Random mode (s.rnd) there's no computer or daily: the choice holds for every game in the run */
+function pickWho(s,ctx,wrap,o){
   const I=(...d)=>sv('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},...d.map(x=>sv('path',{d:x})));
   const card=(cls,icon,title,sub,f)=>{const b=el('button',{class:'sdk-pick '+cls,type:'button'},el('span',{class:'ic'},icon),el('span',{class:'tx'},el('b',{},title),el('small',{},sub)));
     b.disabled=!ctx.live;b.addEventListener('click',f);return b};
   const knight=typeof Mascot!=='undefined'?Mascot.pose(false):I('M12 3v18');
   const join=el('button',{class:'linkish',type:'button'},'Join a room');join.addEventListener('click',()=>Online.open());
-  wrap.append(el('div',{class:'sdk-choose'},el('h3',{},'How do you want to play?'),
+  const rnd=!!s.rnd;
+  wrap.append(el('div',{class:'sdk-choose'},el('h3',{},rnd?'Random mode: who are you playing?':'How do you want to play?'),
+    rnd?el('p',{class:'fine sdk-join'},'Every game in the run is picked at random, and the score carries from one game to the next.'):null,
     card('pk-online',I('M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7','M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'),'Play a friend online','Send a link or a room code. They play on their own phone or computer.',()=>Online.open()),
-    card('pk-bot',knight,'Play the computer','Play the knight. It plays like a person, not a machine.',()=>ctx.configure({...clone(s),vs:'bot',bot:1})),
-    card('pk-here',I('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2','M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8','M22 21v-2a4 4 0 0 0-3-3.9','M16 3.1a4 4 0 0 1 0 7.8'),'Play a friend here','Two players on this screen, each with their own number pad.',()=>ctx.configure({...clone(s),vs:'here',bot:0})),
-    card('pk-daily',I('M8 2v4','M16 2v4','M3 10h18','M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'),'Today’s daily challenge',`Everyone gets the same puzzle today (${sdkDayName(sdkDay())}). Race a friend for the leaderboard.`,()=>ctx.configure({...sdkDaily(),turn:s.turn})),
+    o.bot&&!rnd?card('pk-bot',knight,'Play the computer','Play the knight. It plays like a person, not a machine.',()=>ctx.configure({...clone(s),vs:'bot',bot:1})):null,
+    card('pk-here',I('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2','M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8','M22 21v-2a4 4 0 0 0-3-3.9','M16 3.1a4 4 0 0 1 0 7.8'),'Play a friend here',rnd?'Two players on this screen.':o.here,()=>ctx.configure({...clone(s),vs:'here',bot:0})),
+    o.daily&&!rnd?card('pk-daily',I('M8 2v4','M16 2v4','M3 10h18','M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'),'Today’s daily challenge',`Everyone gets the same puzzle today (${sdkDayName(sdkDay())}). Race a friend for the leaderboard.`,()=>ctx.configure({...sdkDaily(),turn:s.turn})):null,
     el('p',{class:'fine sdk-join'},'Got a room code from a friend? ',join)));
   ctx.say('Choose who you want to play.');
   return wrap;
+}
+const sdkChooser=(s,ctx,wrap)=>pickWho(s,ctx,wrap,{bot:1,daily:1,here:'Two players on this screen, each with their own number pad.'});
+/* the set-up rows for who you're playing (DuSoKu and Amazons): Change goes back to the chooser, leaving an online match;
+   a friend on this screen gets a box for their name, so nobody has to fill it in up top */
+function whoRows(s,ctx,row){
+  const change=el('button',{class:'linkish',type:'button'},'Change');change.disabled=!sdkOnline()&&!ctx.live;
+  change.addEventListener('click',()=>{
+    if(!sdkOnline()){ctx.configure({...clone(s),vs:0,bot:0});return}
+    if(!confirm('Leave this online match and choose someone else to play?'))return;
+    Online.end();S.state={...clone(S.state),vs:0,bot:0};S.ui={};renderPlay(true);
+  });
+  const who=sdkOnline()?(Online.friend?`${name(1-Online.me)}, online`:'A friend online (waiting for them to join)'):s.bot?'The computer':'A friend on this screen';
+  let them=null;
+  if(!sdkOnline()&&!s.bot){
+    const inp=el('input',{class:'name-in sdk-them',maxlength:'16',autocomplete:'off',placeholder:'Their name','aria-label':'Their name',value:S.names[1]||''});
+    inp.addEventListener('input',()=>{S.names[1]=S.opp=inp.value;$('nameR').value=inp.value;renderInfo()});
+    them=row('Their name',inp);
+  }
+  return [row('Playing',el('span',{class:'sdk-vs'},who),change),them];
 }
 function sdkDailySetup(s,ctx,wrap){
   const on=sdkOnline(),mate=()=>on?Online.friend:!!(S.names[1]||'').trim();
@@ -884,23 +957,8 @@ def({id:'duosudoku',name:'DuSoKu',kind:'Scoring',sfx:'pop',motif:'tile',isNew:tr
       const row=(label,...b)=>el('div',{class:'sdk-opt'},el('span',{class:'role'},label),...b);
       const diff=s.diff||'medium',level=(label,d)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(diff===d)},label);
         b.disabled=!ctx.live;b.addEventListener('click',()=>{if(diff!==d)ctx.configure({...clone(s),...sdkBoard(d)})});return b};
-      /* seat 1 can be the computer (js/sdkbot.js), on one screen only */
-      /* who you're playing was chosen on the screen before (sdkChooser); Change goes back there, leaving an online match */
-      const change=el('button',{class:'linkish',type:'button'},'Change');change.disabled=!sdkOnline()&&!ctx.live;
-      change.addEventListener('click',()=>{
-        if(!sdkOnline()){ctx.configure({...clone(s),vs:0,bot:0});return}
-        if(!confirm('Leave this online match and choose someone else to play?'))return;
-        Online.end();S.state={...clone(S.state),vs:0,bot:0};S.ui={};renderPlay(true);
-      });
-      const who=sdkOnline()?(Online.friend?`${name(1-Online.me)}, online`:'A friend online (waiting for them to join)'):s.bot?'The computer':'A friend on this screen';
-      /* a friend on this screen: their name here, so nobody has to fill it in up top */
-      let them=null;
-      if(!sdkOnline()&&!s.bot){
-        const inp=el('input',{class:'name-in sdk-them',maxlength:'16',autocomplete:'off',placeholder:'Their name','aria-label':'Their name',value:S.names[1]||''});
-        inp.addEventListener('input',()=>{S.names[1]=S.opp=inp.value;$('nameR').value=inp.value;renderInfo()});
-        them=row('Their name',inp);
-      }
-      const rows=[row('Playing',el('span',{class:'sdk-vs'},who),change),them,row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
+      /* seat 1 can be the computer (js/sdkbot.js), on one screen only; who you're playing was chosen on the screen before */
+      const rows=[...whoRows(s,ctx,row),row('Difficulty',level('Medium','medium'),level('Hard','hard')),row('Mode',pick2('Rapid fire',rapid,{mode:'rapid',limit:SDK_GAME,clock:[0,0],turnLimit:0}),pick2('Take turns',!rapid,{mode:'turns',limit:SDK_GAME/2,clock:[SDK_GAME/2,SDK_GAME/2],turnLimit:0}))];
       rows.push(row('Scoring',pick2('By difficulty',s.scoring==='diff',{scoring:'diff'}),pick2('Number value',s.scoring!=='diff',{scoring:'number'})));
       const waitFriend=sdkOnline()&&!Online.friend;
       const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':'Start game');
@@ -1020,3 +1078,14 @@ if(typeof document!=='undefined'){
     if(mine||Math.min(tot,turn)<-4000) fire();
   },250);
 }
+/* Amazons: the clocks tick here. Out of time for a move passes the turn, out of all your time loses. The device of the
+   player to move acts on it, or the other device once it's 4 seconds late (the mover may have gone) */
+if(typeof document!=='undefined') setInterval(()=>{
+  if(typeof S==='undefined'||S.gid!=='amazons'||!S.state||!S.state.set||S.over) return;
+  const s=S.state,p=s.turn,tot=amzLeft(s,p),left=Math.min(s.turnLimit-amzUsed(s),tot);
+  document.querySelectorAll(`#board .sdk-clock[data-p="${p}"]`).forEach(e=>{e.textContent=sdkFmt(tot);e.classList.toggle('low',tot<30000)});
+  document.querySelectorAll('#board .sdk-turnbar').forEach(e=>{e.querySelector('i').style.setProperty('--w',Math.max(0,left/s.turnLimit*100)+'%');e.lastChild.textContent=Math.max(0,Math.ceil(left/1000))+'s';e.classList.toggle('low',left<5000)});
+  if(left>0||S.busy) return;
+  if(sdkOnline()&&Online.me!==p&&left>-4000) return;
+  ctx.play(tot<=0?amzFlag(s):amzSkip(s),null,{silent:true});
+},250);

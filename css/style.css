@@ -993,3 +993,20 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .sdk-join{text-align:center;margin:2px 0 0}
 .sdk-vs{font-weight:700}
 .sdk-them{max-width:180px;padding:7px 10px;font-size:15px}
+/* Random mode (2026-11-15): the home card, the run's score above the board, and its line on the end card */
+.rnd-card{background:#f2eefb;border-color:#7a5cc4}
+.rndbar{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;align-self:center;padding:6px 14px;border-radius:999px;background:#f2eefb;border:1px solid #d9cff2;font-size:14px;order:-1}
+.rndbar b{font-weight:800}
+.rndbar .p0{color:var(--left);font-weight:700} .rndbar .p1{color:var(--right);font-weight:700}
+.res-run{margin:0;padding:12px 18px 0;text-align:center;font-size:14px;color:var(--muted)}
+.res-run b{color:var(--ink)}
+/* Amazons in play: both clocks, the 20-second bar for whoever is to move, then the board */
+.amz{--sk:44px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.amz .sdk-turnbar .amz-who{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+.demo-box .amz .sdk-turnbar,.gprev .amz .sdk-scores{display:none}
+@media (min-width:881px){
+  .focus .amz{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:24px;row-gap:10px;align-items:center;width:100%}
+  .focus .amz>.sdk-turnbar{grid-column:2;grid-row:1;width:100%;max-width:none;min-width:0}
+  .focus .amz>.board-grid{grid-column:2;grid-row:2}
+  .focus .amz .sdk-score{grid-row:2}
+}

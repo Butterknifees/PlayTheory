@@ -48,11 +48,14 @@
         },
         "elo": {
           "$side": {
-            ".validate": "newData.hasChildren(['rapid', 'turns']) && ((newData.child('rapid').val() === data.child('rapid').val() && newData.child('turns').val() === data.child('turns').val()) || (($side === 'L' && newData.parent().parent().child('host').val() === auth.uid) || ($side === 'R' && newData.parent().parent().child('guest').val() === auth.uid)))",
+            ".validate": "newData.hasChildren(['rapid', 'turns']) && ((newData.child('rapid').val() === data.child('rapid').val() && newData.child('turns').val() === data.child('turns').val() && newData.child('amazons').val() === data.child('amazons').val()) || (($side === 'L' && newData.parent().parent().child('host').val() === auth.uid) || ($side === 'R' && newData.parent().parent().child('guest').val() === auth.uid)))",
             "rapid": {
               ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
             },
             "turns": {
+              ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
+            },
+            "amazons": {
               ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000"
             },
             "$other": {
@@ -151,13 +154,13 @@
     },
     "ratings": {
       "$pool": {
-        ".read": "auth != null && ($pool === 'rapid' || $pool === 'turns')",
+        ".read": "auth != null && ($pool === 'rapid' || $pool === 'turns' || $pool === 'amazons')",
         ".indexOn": [
           "r"
         ],
         "$uid": {
           ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.exists()",
-          ".validate": "($pool === 'rapid' || $pool === 'turns') && newData.hasChildren(['r', 'n', 'w', 'l', 'd', 'name', 'opp', 'm', 'g', 'at']) && (!data.exists() || data.child('at').val() < now - 30000) && newData.child('w').val() + newData.child('l').val() + newData.child('d').val() === newData.child('n').val() && !root.child('rated').child(newData.child('m').val()).child(newData.child('g').val()).child($uid).exists() && newData.parent().parent().parent().child('rated').child(newData.child('m').val()).child(newData.child('g').val()).child($uid).exists()",
+          ".validate": "($pool === 'rapid' || $pool === 'turns' || $pool === 'amazons') && newData.hasChildren(['r', 'n', 'w', 'l', 'd', 'name', 'opp', 'm', 'g', 'at']) && (!data.exists() || data.child('at').val() < now - 30000) && newData.child('w').val() + newData.child('l').val() + newData.child('d').val() === newData.child('n').val() && !root.child('rated').child(newData.child('m').val()).child(newData.child('g').val()).child($uid).exists() && newData.parent().parent().parent().child('rated').child(newData.child('m').val()).child(newData.child('g').val()).child($uid).exists()",
           "r": {
             ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 4000 && (data.exists() ? (newData.val() - data.val() <= 40 && data.val() - newData.val() <= 40) : (newData.val() - 1200 <= 40 && 1200 - newData.val() <= 40))"
           },
