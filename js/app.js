@@ -256,7 +256,7 @@ const FILTERS=[['all','All games'],['new','New'],['Partizan',KIND.Partizan],['Im
 let filter='all',previewObs=null;
 const FEATURED='duosudoku';
 /* only these games are open for now; every other card says Coming soon and cannot be started */
-const PLAYABLE=new Set([FEATURED,'amazons']);
+const PLAYABLE=new Set([FEATURED,'amazons','exedout','hollow']);
 const playable=id=>PLAYABLE.has(id);
 function view(v){
   const home=v==='home';
@@ -321,7 +321,7 @@ function buildFeatured(){
 function buildRandom(){
   const box=$('rndCard');if(!box||box.firstChild) return;
   const go=el('button',{class:'btn primary',type:'button'},'Start Random mode');go.addEventListener('click',()=>{Sound.unlock();startRandom()});
-  const names=GAMES.filter(g=>playable(g.id)).map(g=>g.name).join(' or ');
+  const n=GAMES.filter(g=>playable(g.id)).map(g=>g.name),names=n.length>1?n.slice(0,-1).join(', ')+' or '+n[n.length-1]:n[0];
   box.replaceChildren(el('div',{class:'daily-txt'},
     el('div',{class:'gmeta'},el('span',{class:'chip new'},'New'),el('span',{class:'chip'},'A run of games')),
     el('h3',{},'Random mode'),

@@ -1001,12 +1001,34 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .res-run{margin:0;padding:12px 18px 0;text-align:center;font-size:14px;color:var(--muted)}
 .res-run b{color:var(--ink)}
 /* Amazons in play: both clocks, the 20-second bar for whoever is to move, then the board */
-.amz{--sk:44px;display:flex;flex-direction:column;align-items:center;gap:10px}
-.amz .sdk-turnbar .amz-who{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
-.demo-box .amz .sdk-turnbar,.gprev .amz .sdk-scores{display:none}
+.clk{--sk:44px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.clk .sdk-turnbar .clk-who{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+.demo-box .clk .sdk-turnbar,.gprev .clk .sdk-scores{display:none}
 @media (min-width:881px){
-  .focus .amz{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:24px;row-gap:10px;align-items:center;width:100%}
-  .focus .amz>.sdk-turnbar{grid-column:2;grid-row:1;width:100%;max-width:none;min-width:0}
-  .focus .amz>.board-grid{grid-column:2;grid-row:2}
-  .focus .amz .sdk-score{grid-row:2}
+  .focus .clk{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:24px;row-gap:10px;align-items:center;width:100%}
+  .focus .clk>.sdk-turnbar{grid-column:2;grid-row:1;width:100%;max-width:none;min-width:0}
+  .focus .clk>:last-child{grid-column:2;grid-row:2}
+  .focus .clk .sdk-score{grid-row:2}
+  .focus .clk{padding-bottom:48px} /* room for Exit game and Colours, bottom left, under short boards */
 }
+/* Exed-Out (2026-11-15): the boards side by side; a closed board fades, with its three in a row marked */
+.exo{--cell:clamp(30px,7vw,44px);display:flex;flex-direction:column;align-items:center;gap:10px}
+.exo-left{margin:0;font:700 14px var(--f-display);color:var(--muted)}
+.exo-left.last{color:#c0392b}
+.exo-row{display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
+.exo-b{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:12px;background:var(--surface);border:2px solid var(--line)}
+.exo-b.dead{opacity:.55;background:var(--surface-2)}
+.exo-n{font:600 12px var(--f-mono);color:var(--muted)}
+.exo-g{display:grid;grid-template-columns:repeat(3,var(--cell));gap:4px}
+.exo-c{width:var(--cell);height:var(--cell);border-radius:6px;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;padding:0;font:900 calc(var(--cell)*.6)/1 var(--f-display);color:var(--ink)}
+button.exo-c{cursor:pointer} button.exo-c:hover,button.exo-c:focus-visible{background:var(--left-soft);outline:none}
+.exo-c.last{box-shadow:0 0 0 3px var(--neutral)}
+.exo-c.hit{background:#f6d5d1;color:#b3261e}
+/* Hollow (2026-11-15): numbers on the hexagons; at the end the hollow and the hexagons around it light up */
+.hol{width:min(100%,var(--mw))}
+.hol-v{fill:#fff;font:800 17px var(--f-display);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.hexcell.last{stroke:var(--neutral);stroke-width:3}
+.hexcell.hole{fill:#fff3c4;stroke:#d39b00;stroke-width:4}
+.hexcell.near{stroke:#d39b00;stroke-width:3}
+.hol-next{font:600 12px var(--f-mono);color:var(--muted);padding:1px 6px;border-radius:6px;background:var(--surface-2);white-space:nowrap}
+@media (min-width:881px){ .focus .clk>.hol{width:min(var(--mw),calc(100vw - 600px),calc((100vh - 170px)*1.15))} }

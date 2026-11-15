@@ -324,53 +324,66 @@ def({id:'konane',name:'Kōnane',kind:'Partizan',sfx:'capture',motif:'disc',
   moves:jumpMoves(konaneMoves),hasMove:jumpHasMove(konaneMoves),
   render:(s,ctx)=>jumpView(s,ctx,konaneMoves)});
 
-/* ---------------- amazons: move like a queen, then shoot a flaming arrow ---------------- */
-const queenReach=(b,r,c)=>{const N=b.length,out=[];for(const [dr,dc] of Q8){let rr=r+dr,cc=c+dc;while(rr>=0&&cc>=0&&rr<N&&cc<N&&b[rr][cc]===null){out.push([rr,cc]);rr+=dr;cc+=dc}}return out};
-/* the clock (owner, 2026-11-15): 4 minutes each, running only on your own turn, and at most 20 seconds a move. s.at is when
-   the current turn began (server time, sdkNow), so both devices count down from the same moment. Out of time for a move:
-   the turn passes, and the time still comes off your 4 minutes. Out of your 4 minutes: you lose (s.flag = who) */
-const AMZ_CLOCK=240000,AMZ_MOVE=20000;
-const amzUsed=s=>s.set&&s.at?Math.max(0,sdkNow()-s.at):0;
-const amzLeft=(s,q)=>s.clock[q]-(q===s.turn&&s.flag==null?amzUsed(s):0);
-function amzSpend(n,s){if(!s.set||!s.at)return;const p=s.turn;n.clock[p]=Math.max(0,s.clock[p]-amzUsed(s));if(!n.clock[p])n.flag=p;n.at=sdkNow()}
-const amazonsShot=(s,from,to,arrow)=>nx(s,n=>{n.b[from[0]][from[1]]=null;n.b[to[0]][to[1]]=PC[s.turn];n.b[arrow[0]][arrow[1]]='X';n.lastArrow=arrow;n.lastAt=Date.now();n.n=(s.n||0)+1;n.last=null;amzSpend(n,s)});
-function amzSkip(s){const p=s.turn,n=clone(s);amzSpend(n,s);n.skips=(s.skips||0)+1;n.last={skip:p,k:n.skips};if(n.flag==null)n.turn=1-p;return n}
-function amzFlag(s){const n=clone(s);n.clock[s.turn]=0;n.flag=s.turn;n.at=sdkNow();return n}
-/* before the clocks start: who you're playing, then Start game. Online only the player who moves first can start */
-function amzSetup(s,ctx,wrap){
+/* ---------------- chess clocks (Amazons, Exed-Out, Hollow; owner, 2026-11-15) ---------------- */
+/* each player's time runs only on their own turn. s.clock[2] is what's left at the start of the current turn and s.at the
+   server time (sdkNow) it began, so both devices count down from the same moment. s.turnLimit (Amazons: 20 s; 0 = none)
+   caps one move: past it the turn passes and the time still comes off. Out of time loses (s.flag = who).
+   A game opts in with clocked:true (the tick at the end of this file), spreads clkNew() into create(), runs every move
+   through clkMove, starts with clkPre() and frames its board with clkFrame() */
+const clkNew=(ms,turnLimit,prev)=>({g:sdkGameId(),set:0,vs:prev&&prev.vs||0,clock:[ms,ms],turnLimit,at:0,n:0,skips:0});
+const clkUsed=s=>s.set&&s.at?Math.max(0,sdkNow()-s.at):0;
+const clkLeft=(s,q)=>s.clock[q]-(q===s.turn&&s.flag==null?clkUsed(s):0);
+const clkMins=ms=>{const m=Math.round(ms/60000);return`${m} ${m===1?'minute':'minutes'}`};
+function clkSpend(n,s){if(!s.set||!s.at)return;const p=s.turn;n.clock[p]=Math.max(0,s.clock[p]-clkUsed(s));if(!n.clock[p])n.flag=p;n.at=sdkNow()}
+function clkMove(n,s){n.n=(s.n||0)+1;n.last=null;clkSpend(n,s)}
+function clkSkip(s){const p=s.turn,n=clone(s);clkSpend(n,s);n.skips=(s.skips||0)+1;n.last={skip:p,k:n.skips};if(n.flag==null)n.turn=1-p;return n}
+function clkFlag(s){const n=clone(s);n.clock[s.turn]=0;n.flag=s.turn;n.at=sdkNow();return n}
+const clkResult=s=>s.flag!=null?{winner:1-s.flag,reason:`${name(s.flag)} ran out of time.`,how:`${name(s.flag)} ran out of time`}:null;
+/* before the clocks start: who you're playing (the shared chooser), then the set-up with Start game. Online only the player
+   who moves first can start. rows: extra [label, ...buttons] for the game's own options */
+function clkPre(s,ctx,rows=[]){
+  const wrap=el('div',{class:'clk'});
+  if(!s.vs&&!sdkOnline()) return pickWho(s,ctx,wrap,{here:'Two players taking turns on this screen.'});
   const row=(label,...b)=>el('div',{class:'sdk-opt'},el('span',{class:'role'},label),...b);
   const waitFriend=sdkOnline()&&!Online.friend,waitThem=sdkOnline()&&Online.friend&&s.turn!==Online.me;
   const go=el('button',{class:'btn primary big sdk-start',type:'button'},waitFriend?'Waiting for your friend…':waitThem?`Waiting for ${name(s.turn)} to start`:'Start game');
   go.disabled=!ctx.live||waitFriend;
   go.addEventListener('click',()=>ctx.configure({...clone(s),set:1,at:sdkNow(),start:sdkNow(),elo:sdkElo(s)}));
-  wrap.append(el('div',{class:'sdk-setup big'},el('h3',{},'Set up the game'),...whoRows(s,ctx,row),
-    row('Clock',el('span',{class:'sdk-vs'},'4 minutes each · 20 seconds a move')),
-    el('p',{class:'fine'},`${name(s.turn)} moves first. Your clock runs only on your turn: take longer than 20 seconds and the turn passes, run out of your 4 minutes and you lose.`),go));
+  const mins=clkMins(s.clock[0]),tl=s.turnLimit/1000;
+  wrap.append(el('div',{class:'sdk-setup big'},el('h3',{},'Set up the game'),...whoRows(s,ctx,row),...rows.map(r=>row(...r)),
+    row('Clock',el('span',{class:'sdk-vs'},`${mins} each${tl?` · ${tl} seconds a move`:''}`)),
+    el('p',{class:'fine'},`${name(s.turn)} moves first. Your clock runs only on your turn${tl?`: take longer than ${tl} seconds and the turn passes, run out of your ${mins} and you lose`:`. Run out of your ${mins} and you lose`}.`),go));
   ctx.say(waitThem?`${name(s.turn)} moves first, so they start the clock.`:'Choose who moves first above, then tap Start game.');
   return wrap;
 }
-/* during the game: both clocks (yours highlighted on your turn) and the 20-second bar for whoever is to move */
-function amzFrame(s,ctx,g,app){
+/* during the game: both clocks (the one to move highlighted), the move bar when there's a per-move limit, then the board.
+   extra(q): something more in each player's pill (Hollow: the number they place next) */
+function clkFrame(s,ctx,board,app,extra){
   const p=s.turn,over=s.flag!=null||(app&&!!S.over);
   const pill=q=>el('div',{class:'sdk-score s'+q+(p===q&&!over?' on':'')},
-    el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&typeof Rating!=='undefined'?Rating.tag(q,s):null),
-    el('span',{class:'sdk-clock'+(amzLeft(s,q)<30000?' low':''),'data-p':q},sdkFmt(amzLeft(s,q))));
-  const wrap=el('div',{class:'amz'},el('div',{class:'sdk-scores'},pill(0),pill(1)));
-  if(!over){const left=Math.min(s.turnLimit-amzUsed(s),amzLeft(s,p)),mine=app&&(sdkOnline()?Online.me===p:true);
-    wrap.append(el('div',{class:'sdk-turnbar t'+p+(left<5000?' low':'')},el('b',{class:'amz-who'},sdkOnline()&&mine?'Your move':name(p)),
+    el('span',{class:'dot'}),el('span',{class:'nm'},name(q),app&&typeof Rating!=='undefined'&&Rating.rates(S.gid)?Rating.tag(q,s):null),extra?extra(q):null,
+    el('span',{class:'sdk-clock'+(clkLeft(s,q)<30000?' low':''),'data-p':q},sdkFmt(clkLeft(s,q))));
+  const wrap=el('div',{class:'clk'},el('div',{class:'sdk-scores'},pill(0),pill(1)));
+  if(!over&&s.turnLimit){const left=Math.min(s.turnLimit-clkUsed(s),clkLeft(s,p)),mine=app&&(sdkOnline()?Online.me===p:true);
+    wrap.append(el('div',{class:'sdk-turnbar t'+p+(left<5000?' low':'')},el('b',{class:'clk-who'},sdkOnline()&&mine?'Your move':name(p)),
       el('div',{class:'trk'},el('i',{style:`--w:${Math.max(0,left/s.turnLimit*100)}%`})),el('span',{},Math.max(0,Math.ceil(left/1000))+'s')))}
-  wrap.append(g);
+  wrap.append(board);
   /* a skipped turn pops up once (not one that happened before this page saw the game) */
-  if(app){if(s.last&&s.last.skip!=null){const k=s.g+':'+s.last.k;if(k!==amzSeen){const seen=amzSeen!=='';amzSeen=k;if(seen)setTimeout(()=>amzToast(s.last.skip),0)}}else amzSeen='-'}
+  if(app){if(s.last&&s.last.skip!=null){const k=s.g+':'+s.last.k;if(k!==clkSeen){const seen=clkSeen!=='';clkSeen=k;if(seen)setTimeout(()=>clkToast(s.last.skip),0)}}else clkSeen='-'}
   return wrap;
 }
-let amzSeen='';
-function amzToast(q){
+let clkSeen='';
+function clkToast(q){
   document.querySelectorAll('.sdk-toast').forEach(e=>e.remove());Sound.fx('bell');
   const t=el('div',{class:'sdk-toast t'+q,role:'status','aria-live':'polite'},el('b',{},`${name(q)} ran out of time for that move`),el('span',{},`The turn passed to ${name(1-q)}.`));
   t.addEventListener('click',()=>t.remove());document.body.append(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350)},2500);
 }
-def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',isNew:true,noUndo:true,
+
+/* ---------------- amazons: move like a queen, then shoot a flaming arrow ---------------- */
+/* the clock (owner, 2026-11-15): 4 minutes each and at most 20 seconds a move */
+const queenReach=(b,r,c)=>{const N=b.length,out=[];for(const [dr,dc] of Q8){let rr=r+dr,cc=c+dc;while(rr>=0&&cc>=0&&rr<N&&cc<N&&b[rr][cc]===null){out.push([rr,cc]);rr+=dr;cc+=dc}}return out};
+const amazonsShot=(s,from,to,arrow)=>nx(s,n=>{n.b[from[0]][from[1]]=null;n.b[to[0]][to[1]]=PC[s.turn];n.b[arrow[0]][arrow[1]]='X';n.lastArrow=arrow;n.lastAt=Date.now();clkMove(n,s)});
+def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',isNew:true,noUndo:true,clocked:true,
   blurb:'Queens move, then fire flaming arrows that burn the board. The space shrinks with every turn.',solved:'no',
   rules:['Each player has two amazons. They move like chess queens: any distance in a straight or diagonal line.','On your turn, move one of your amazons, then she draws her bow and shoots a flaming arrow from her new square. The arrow also travels like a queen.','The arrow sets its square on fire. Nothing may move onto or through burned squares or other amazons.','Whoever makes the last move wins.',
     'The clock: each player has 4 minutes, which run only on their own turn. Each move must be made within 20 seconds. If it isn’t, the turn passes to the other player, and the time still comes off your 4 minutes. Run out of your 4 minutes and you lose.'],
@@ -379,17 +392,17 @@ def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',isNew:t
   create:prev=>{const N=pick([5,6]),b=Array.from({length:N},()=>Array(N).fill(null));
     const a=N===5?[1,3]:[1,4];a.forEach(c=>{b[0][c]='L';b[N-1][c]='R'});
     for(let k=R(0,2);k>0;k--){const r=R(1,N-2),c=R(0,N-1);if(b[r][c]===null){b[r][c]='X';if(b[N-1-r][N-1-c]===null)b[N-1-r][N-1-c]='X'}}
-    return{b,g:sdkGameId(),set:0,vs:prev&&prev.vs||0,clock:[AMZ_CLOCK,AMZ_CLOCK],turnLimit:AMZ_MOVE,at:0,n:0,skips:0}},
+    return{b,...clkNew(240000,20000,prev)}},
   moves:s=>{const out=[],b=s.b;
     b.forEach((row,r)=>row.forEach((v,c)=>{if(v!==PC[s.turn])return;
       queenReach(b,r,c).forEach(to=>{const bd=clone(b);bd[r][c]=null;bd[to[0]][to[1]]=v;queenReach(bd,to[0],to[1]).forEach(ar=>out.push(amazonsShot(s,[r,c],to,ar)))})}));
     return out},
   hasMove:(s,p)=>s.b.some((row,r)=>row.some((v,c)=>v===PC[p]&&queenReach(s.b,r,c).length)),
   ready:s=>!!s.set,
-  result:s=>s.flag!=null?{winner:1-s.flag,reason:`${name(s.flag)} ran out of time.`,how:`${name(s.flag)} ran out of time`}:null,
+  result:clkResult,
   render(s,ctx){
     const app=typeof ctx.configure==='function';
-    if(app&&!s.set){const wrap=el('div',{class:'amz'});return !s.vs&&!sdkOnline()?pickWho(s,ctx,wrap,{here:'Two players taking turns on this screen.'}):amzSetup(s,ctx,wrap)}
+    if(app&&!s.set) return clkPre(s,ctx);
     const p=s.turn,b=s.b,N=b.length,u=ctx.ui;
     let bd=b,targets=[],phase=0;
     if(u.sel&&!u.dest){phase=1;targets=queenReach(b,u.sel[0],u.sel[1])}
@@ -433,7 +446,105 @@ def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',isNew:t
     }
     ctx.say(phase===1?'Click a highlighted square to move there, or click the amazon again to pick the other one.':phase===2?'Now aim: click a square the flaming arrow can reach from her new square. Click her to take the move back.':null);
     /* previews and the demo show just the board; a game in play gets its clocks */
-    return s.set?amzFrame(s,ctx,g,app):g;
+    return s.set?clkFrame(s,ctx,g,app):g;
+  }});
+
+/* ---------------- Exed-Out: tic-tac-toe boards where both players draw X (owner, 2026-11-15) ---------------- */
+/* 3, 4 or 5 boards (set-up choice, 3 by default). Both play X on any open board; three in a row closes a board, and
+   whoever closes the last open board loses. Each player's clock is 1 minute per board, with no limit per move.
+   s.bd[k][9] holds 1 for an X, s.dead[k] the line that closed a board (or null), s.lost who closed the last one */
+const EXO_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const exoBoards=k=>({k,bd:Array.from({length:k},()=>Array(9).fill(0)),dead:Array(k).fill(null),clock:[k*60000,k*60000]});
+const exoOpen=s=>s.dead.filter(d=>!d).length;
+const exoPlay=(s,b,i)=>nx(s,n=>{n.bd[b][i]=1;n.lastX=[b,i];const l=EXO_LINES.find(l=>l.every(j=>n.bd[b][j]));
+  if(l){n.dead[b]=l;if(!n.dead.some(d=>!d))n.lost=s.turn}clkMove(n,s)});
+def({id:'exedout',name:'Exed-Out',kind:'Impartial',sfx:'stamp',motif:'tile',isNew:true,noUndo:true,clocked:true,
+  blurb:'Tic-tac-toe where both players draw X, on three to five boards at once. Close the last board and you lose.',solved:'yes',
+  rules:s=>['There are '+(s&&s.k||3)+' tic-tac-toe boards (3, 4 or 5: choose before the game). Both players draw the same mark, X.',
+    'On your turn, put an X in any empty square on any board that is still open.',
+    'Three Xs in a row (across, down or diagonally) close that board: nobody may play on it again.',
+    'Whoever makes three in a row on the last open board loses.',
+    'The clock: each player has 1 minute per board ('+(s&&s.k||3)+' minutes here), running only on their own turn. Run out and you lose.'],
+  win:'Whoever closes the last open board loses. Running out of time also loses.',
+  how:'Click an empty square on any open board.',
+  create:prev=>({...clkNew(0,0,prev),...exoBoards(prev&&prev.k||3)}),
+  moves:s=>s.bd.flatMap((c,b)=>s.dead[b]?[]:c.flatMap((v,i)=>v?[]:[exoPlay(s,b,i)])),
+  hasMove:s=>s.dead.some(d=>!d),
+  ready:s=>!!s.set,
+  result:s=>clkResult(s)||(s.lost!=null?{winner:1-s.lost,reason:`${name(s.lost)} made three in a row on the last open board.`,how:`${name(s.lost)} closed the last board`}:null),
+  render(s,ctx){
+    const app=typeof ctx.configure==='function';
+    if(app&&!s.set){
+      const k=n=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(s.k===n)},String(n));b.disabled=!ctx.live;
+        b.addEventListener('click',()=>{if(s.k!==n)ctx.configure({...clone(s),...exoBoards(n)})});return b};
+      return clkPre(s,ctx,[['Boards',k(3),k(4),k(5)]]);
+    }
+    const open=exoOpen(s),wrap=el('div',{class:'exo'});
+    if(s.set) wrap.append(el('p',{class:'exo-left'+(open===1?' last':'')},open===1?'Last board: three in a row on it loses':`${open} of ${s.k} boards open`));
+    const row=el('div',{class:'exo-row'});
+    s.bd.forEach((c,b)=>{
+      const dead=s.dead[b],g=el('div',{class:'exo-g'});
+      c.forEach((v,i)=>{
+        const on=!v&&!dead&&ctx.live,last=s.lastX&&s.lastX[0]===b&&s.lastX[1]===i;
+        const q=el(on?'button':'div',{class:'exo-c'+(v?' x':'')+(last?' last':'')+(dead&&dead.includes(i)?' hit':''),type:on?'button':null,
+          'aria-label':`Board ${b+1}, row ${(i/3|0)+1}, column ${i%3+1}, ${v?'X':'empty'}`},v?'X':'');
+        if(on) q.addEventListener('click',()=>ctx.play(exoPlay(s,b,i),()=>{q.classList.add('x','stamp');q.textContent='X';return sleep(140)}));
+        g.append(q);
+      });
+      row.append(el('div',{class:'exo-b'+(dead?' dead':'')},el('span',{class:'exo-n'},dead?`Board ${b+1} · closed`:`Board ${b+1}`),g));
+    });
+    wrap.append(row);
+    ctx.say(open===1?'Only one board is left: whoever makes three in a row on it loses.':`Click an empty square on any open board. Three in a row closes a board; whoever closes the last one loses.`);
+    return s.set?clkFrame(s,ctx,wrap,app):wrap;
+  }});
+
+/* ---------------- Hollow: numbers on a triangle of hexagons (owner, 2026-11-15) ---------------- */
+/* 21 hexagons in rows of 1 to 6. Players take turns placing their own numbers in order, 1 up to 10. The one hexagon left
+   empty is the hollow: whoever's numbers touching it add up to less wins; equal totals are a draw. 4 minutes each.
+   s.v[21] the numbers (0 = empty), s.o[21] whose (-1 = nobody). HOL.nb[i] = the hexagons next to i (2 to 6) */
+const HOL_N=6,HOL=(()=>{const rc=[];for(let r=0;r<HOL_N;r++)for(let c=0;c<=r;c++)rc.push([r,c]);
+  const at=(r,c)=>rc.findIndex(x=>x[0]===r&&x[1]===c);
+  return{rc,nb:rc.map(([r,c])=>[[r,c-1],[r,c+1],[r-1,c-1],[r-1,c],[r+1,c],[r+1,c+1]].map(x=>at(...x)).filter(i=>i>=0))}})();
+const holNext=(s,p)=>s.o.filter(o=>o===p).length+1;
+const holPlace=(s,i)=>nx(s,n=>{n.v[i]=holNext(s,s.turn);n.o[i]=s.turn;n.lastI=i;clkMove(n,s)});
+const holDone=s=>s.v.filter(x=>!x).length<=1;
+def({id:'hollow',name:'Hollow',kind:'Partizan',sfx:'chip',motif:'hex',isNew:true,noUndo:true,clocked:true,
+  blurb:'Place your numbers 1 to 10 on a triangle of hexagons. One hexagon stays empty, and the lower total around it wins.',solved:'no',
+  rules:['The board is a triangle of 21 hexagons. Each player has the numbers 1 to 10, in their own colour.',
+    'Players take turns placing their next number on any empty hexagon, in order: 1, then 2, then 3, up to 10.',
+    'When all 20 numbers are down, one hexagon is left empty: the hollow.',
+    'Add up each player’s numbers on the hexagons touching the hollow (up to 6 of them). The lower total wins, and equal totals are a draw. A player with no numbers touching it has 0.',
+    'The clock: each player has 4 minutes, running only on their own turn. Run out and you lose.'],
+  win:'The lower total next to the hollow wins; equal totals draw. Running out of time loses.',
+  how:'Click an empty hexagon to place your next number.',
+  create:prev=>({v:Array(21).fill(0),o:Array(21).fill(-1),...clkNew(240000,0,prev)}),
+  moves:s=>holDone(s)?[]:s.v.flatMap((x,i)=>x?[]:[holPlace(s,i)]),
+  hasMove:s=>!holDone(s),
+  ready:s=>!!s.set,
+  result:s=>{
+    const t=clkResult(s);if(t||!holDone(s)) return t;
+    const e=s.v.indexOf(0),by=[[],[]];HOL.nb[e].forEach(j=>by[s.o[j]].push(s.v[j]));
+    const [a,b]=by.map(x=>x.reduce((u,v)=>u+v,0)),sh=q=>by[q].length?`${by[q].sort((x,y)=>x-y).join(' + ')} = ${[a,b][q]}`:'nothing, so 0';
+    const why=`Next to the hollow: ${name(0)} ${sh(0)}; ${name(1)} ${sh(1)}.`;
+    return a===b?{winner:'draw',reason:`${why} Equal totals: a draw.`,how:`Level at ${a} each next to the hollow`}
+      :{winner:a<b?0:1,reason:`${why} The lower total wins.`,how:`${Math.min(a,b)} to ${Math.max(a,b)} next to the hollow`};
+  },
+  render(s,ctx){
+    const app=typeof ctx.configure==='function';
+    if(app&&!s.set) return clkPre(s,ctx);
+    const p=s.turn,z=26,s3=Math.sqrt(3),pad=10,done=holDone(s);
+    const W=pad*2+HOL_N*z*s3,H=pad*2+z*(2+1.5*(HOL_N-1)),X=(r,c)=>W/2+(c-r/2)*z*s3,Y=r=>pad+z+1.5*z*r;
+    const svg=sv('svg',{viewBox:`0 0 ${W.toFixed(1)} ${H.toFixed(1)}`,class:'svgb hol',style:`--mw:${Math.round(W*1.7)}px`});
+    const hole=done?s.v.indexOf(0):-1,near=hole>=0?new Set(HOL.nb[hole]):null;
+    HOL.rc.forEach(([r,c],i)=>{
+      const v=s.v[i],o=s.o[i],pts=[270,330,30,90,150,210].map(a=>{const t=a*Math.PI/180;return(X(r,c)+z*Math.cos(t)).toFixed(1)+','+(Y(r)+z*Math.sin(t)).toFixed(1)}).join(' ');
+      const poly=sv('polygon',{points:pts,class:'hexcell'+(v?' h'+PC[o]:'')+(i===hole?' hole':'')+(near&&near.has(i)?' near':'')+(i===s.lastI&&!done?' last':'')});
+      svg.append(poly);
+      if(v) svg.append(sv('text',{x:X(r,c).toFixed(1),y:Y(r).toFixed(1),class:'hol-v'},String(v)));
+      else if(ctx.live&&!done){poly.classList.add('ok','t'+p);act(poly,()=>ctx.play(holPlace(s,i),()=>{poly.classList.add('h'+PC[p],'stamp');return sleep(120)}),`Hexagon ${i+1}: place your ${holNext(s,p)}`)}
+    });
+    ctx.say(done?null:`${name(p)}: click an empty hexagon to place your ${holNext(s,p)}. The last empty hexagon decides it: the lower total around it wins.`);
+    return s.set?clkFrame(s,ctx,svg,app,q=>el('span',{class:'hol-next'},holNext(s,q)<=10?`next ${holNext(s,q)}`:'all placed')):svg;
   }});
 
 /* ---------------- graph colouring ---------------- */
@@ -1078,14 +1189,14 @@ if(typeof document!=='undefined'){
     if(mine||Math.min(tot,turn)<-4000) fire();
   },250);
 }
-/* Amazons: the clocks tick here. Out of time for a move passes the turn, out of all your time loses. The device of the
-   player to move acts on it, or the other device once it's 4 seconds late (the mover may have gone) */
+/* chess clocks (clocked games): they tick here. Out of time for a move passes the turn, out of all your time loses. The
+   device of the player to move acts on it, or the other device once it's 4 seconds late (the mover may have gone) */
 if(typeof document!=='undefined') setInterval(()=>{
-  if(typeof S==='undefined'||S.gid!=='amazons'||!S.state||!S.state.set||S.over) return;
-  const s=S.state,p=s.turn,tot=amzLeft(s,p),left=Math.min(s.turnLimit-amzUsed(s),tot);
+  if(typeof S==='undefined'||!S.game||!S.game.clocked||!S.state||!S.state.set||S.over) return;
+  const s=S.state,p=s.turn,tot=clkLeft(s,p),left=s.turnLimit?Math.min(s.turnLimit-clkUsed(s),tot):tot;
   document.querySelectorAll(`#board .sdk-clock[data-p="${p}"]`).forEach(e=>{e.textContent=sdkFmt(tot);e.classList.toggle('low',tot<30000)});
   document.querySelectorAll('#board .sdk-turnbar').forEach(e=>{e.querySelector('i').style.setProperty('--w',Math.max(0,left/s.turnLimit*100)+'%');e.lastChild.textContent=Math.max(0,Math.ceil(left/1000))+'s';e.classList.toggle('low',left<5000)});
   if(left>0||S.busy) return;
   if(sdkOnline()&&Online.me!==p&&left>-4000) return;
-  ctx.play(tot<=0?amzFlag(s):amzSkip(s),null,{silent:true});
+  ctx.play(tot<=0?clkFlag(s):clkSkip(s),null,{silent:true});
 },250);

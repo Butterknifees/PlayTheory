@@ -27,6 +27,8 @@ const THEMES={
   cram:       {m:'Packed Board',bpm:140,root:72,sc:'major',prog:[0,5,3,4],lead:'chip',dens:.55,arp:'chip',bass:'pluck',bp:H8,dr:{k:K4,s:S2,h:H16}},
   clobber:    {m:'Stone Crash',bpm:96,root:52,sc:'phrygian',prog:[0,1,0,6],lead:'horn',dens:.3,pad:'warm',bass:'sub',bp:'x..x..x.........',dr:{t:'x..x..x...x.x...',s:'............x...'}},
   konane:     {m:'Island Jumps',bpm:112,root:67,sc:'penta',prog:[0,3,4,0],lead:'uke',dens:.55,bass:'soft',bp:'x..x..x.x..x..x.',dr:{c:'x.xxx.xxx.xxx.x.',w:'....x.......x...'}},
+  exedout:    {m:'Crossed Out',bpm:116,root:64,sc:'dorian',prog:[0,3,4,3],lead:'epiano',dens:.45,bass:'pluck',bp:'x...x...x.x.x...',dr:{k:'x.......x.......',h:'..x...x...x...x.'},swing:.1},
+  hollow:     {m:'The Hollow',bpm:84,root:57,sc:'penta',prog:[0,4,3,4],lead:'harp',dens:.35,pad:'warm',bass:'soft',bp:'x.......x.......',dr:{c:'x...x...x...x...'}},
   amazons:    {m:'Queens at War',bpm:92,root:50,sc:'harmonic',prog:[0,5,3,4],lead:'horn',dens:.35,pad:'warm',bass:'sub',bp:'x.......x.x.....',dr:{t:'x..x..x.x.......',s:'....x.......x..x',h:OFF}},
   snort:      {m:'Barnyard',bpm:120,root:65,sc:'major',prog:[0,3,4,0],lead:'uke',dens:.5,bass:'soft',bp:'x...o...x...o...',dr:{w:OFF,k:K4}},
   col:        {m:'Colour Theory',bpm:80,root:67,sc:'lydian',prog:[0,1,4,0],lead:'glass',dens:.35,pad:'choir',bass:'soft',bp:'x...............'},
