@@ -851,7 +851,9 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 @keyframes toastin{from{opacity:0;transform:translate(-50%,-12px)}}
 
 /* the end card: sits over the board when a game ends (resultCard in js/app.js) */
-.res-pop{position:absolute;inset:0;z-index:20;display:grid;place-items:center;padding:16px;overflow:auto;background:rgba(36,36,36,.38);animation:fadein .25s ease-out}
+.res-pop{position:absolute;inset:0;z-index:20;display:grid;place-items:center;align-items:safe center;padding:16px;overflow:auto;background:rgba(36,36,36,.38);animation:fadein .25s ease-out}
+/* a short board (Exed-Out) left too little room: the play area grows while the end card shows */
+.play:has(>.res-pop:not([hidden])){min-height:640px}
 .res-card{position:relative;width:min(420px,100%);background:var(--surface);border-radius:20px;overflow:hidden;box-shadow:0 22px 60px rgba(20,26,36,.35);animation:cardin .35s cubic-bezier(.2,1.2,.4,1)}
 @keyframes fadein{from{opacity:0}}
 @keyframes cardin{from{opacity:0;transform:translateY(18px) scale(.96)}}
@@ -1001,7 +1003,7 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .res-run{margin:0;padding:12px 18px 0;text-align:center;font-size:14px;color:var(--muted)}
 .res-run b{color:var(--ink)}
 /* Amazons in play: both clocks, the 20-second bar for whoever is to move, then the board */
-.clk{--sk:44px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.clk{--sk:52px;display:flex;flex-direction:column;align-items:center;gap:10px}
 .clk .sdk-turnbar .clk-who{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
 .demo-box .clk .sdk-turnbar,.gprev .clk .sdk-scores{display:none}
 @media (min-width:881px){
@@ -1018,6 +1020,8 @@ body[data-pal="lavender"]{--sk-b2:#efe9fa;--sk-b3:#e1d6f5;--skt-b2:#e9e1f4;--skt
 .exo-row{display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
 .exo-b{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:12px;background:var(--surface);border:2px solid var(--line)}
 .exo-b.dead{opacity:.55;background:var(--surface-2)}
+.exo-b.lose{background:var(--surface);border-color:#c0392b;box-shadow:0 0 0 3px rgba(192,57,43,.15)}
+.exo-b.lose .exo-c.last{box-shadow:0 0 0 3px #c0392b}
 .exo-n{font:600 12px var(--f-mono);color:var(--muted)}
 .exo-g{display:grid;grid-template-columns:repeat(3,var(--cell));gap:4px}
 .exo-c{width:var(--cell);height:var(--cell);border-radius:6px;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;padding:0;font:900 calc(var(--cell)*.6)/1 var(--f-display);color:var(--ink)}
@@ -1025,10 +1029,14 @@ button.exo-c{cursor:pointer} button.exo-c:hover,button.exo-c:focus-visible{backg
 .exo-c.last{box-shadow:0 0 0 3px var(--neutral)}
 .exo-c.hit{background:#f6d5d1;color:#b3261e}
 /* Hollow (2026-11-15): numbers on the hexagons; at the end the hollow and the hexagons around it light up */
-.hol{width:min(100%,var(--mw))}
+.hol-box{width:min(100%,var(--mw));display:flex;flex-direction:column;align-items:center;gap:8px}
+.hol-box .hol{width:100%;max-width:none}
+.hol .hexcell,.hol .hexcell.hL,.hol .hexcell.hR{stroke:#fff;stroke-width:3;stroke-linejoin:round}
+.hol .hexcell{fill:#e3e8ef} .hol .hexcell.hL{fill:var(--left)} .hol .hexcell.hR{fill:var(--right)} .hol .hexcell.hole{fill:#fff1b8}
 .hol-v{fill:#fff;font:800 17px var(--f-display);text-anchor:middle;dominant-baseline:central;pointer-events:none}
-.hexcell.last{stroke:var(--neutral);stroke-width:3}
-.hexcell.hole{fill:#fff3c4;stroke:#d39b00;stroke-width:4}
-.hexcell.near{stroke:#d39b00;stroke-width:3}
+.hol-ring{fill:none;stroke-width:3;stroke-linejoin:round;pointer-events:none}
+.hol-ring.last{stroke:var(--neutral)} .hol-ring.hole{stroke:#d39b00;stroke-width:4} .hol-ring.near{stroke:#f2b705}
+.hol-sum{margin:0;font:700 15px var(--f-display);color:var(--muted)} .hol-sum .p0{color:var(--left)} .hol-sum .p1{color:var(--ink)}
 .hol-next{font:600 12px var(--f-mono);color:var(--muted);padding:1px 6px;border-radius:6px;background:var(--surface-2);white-space:nowrap}
-@media (min-width:881px){ .focus .clk>.hol{width:min(var(--mw),calc(100vw - 600px),calc((100vh - 170px)*1.15))} }
+.hol-next b{color:var(--ink)}
+@media (min-width:881px){ .focus .clk>.hol-box{width:min(var(--mw),calc(100vw - 600px),calc((100vh - 200px)*1.15))} }

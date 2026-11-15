@@ -452,12 +452,14 @@ def({id:'amazons',name:'Amazons',kind:'Partizan',sfx:'step',motif:'disc',isNew:t
 /* ---------------- Exed-Out: tic-tac-toe boards where both players draw X (owner, 2026-11-15) ---------------- */
 /* 3, 4 or 5 boards (set-up choice, 3 by default). Both play X on any open board; three in a row closes a board, and
    whoever closes the last open board loses. Each player's clock is 1 minute per board, with no limit per move.
-   s.bd[k][9] holds 1 for an X, s.dead[k] the line that closed a board (or null), s.lost who closed the last one */
+   s.bd[k][9] holds 1 for an X, s.dead[k] the line that closed a board (or null), s.lost who closed the last one;
+   s.xs and s.cl count each player's Xs and closed boards (for the end card) */
 const EXO_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const exoBoards=k=>({k,bd:Array.from({length:k},()=>Array(9).fill(0)),dead:Array(k).fill(null),clock:[k*60000,k*60000]});
 const exoOpen=s=>s.dead.filter(d=>!d).length;
-const exoPlay=(s,b,i)=>nx(s,n=>{n.bd[b][i]=1;n.lastX=[b,i];const l=EXO_LINES.find(l=>l.every(j=>n.bd[b][j]));
-  if(l){n.dead[b]=l;if(!n.dead.some(d=>!d))n.lost=s.turn}clkMove(n,s)});
+const exoPlay=(s,b,i)=>nx(s,n=>{n.bd[b][i]=1;n.lastX=[b,i];n.xs=[...(s.xs||[0,0])];n.xs[s.turn]++;
+  const l=EXO_LINES.find(l=>l.every(j=>n.bd[b][j]));
+  if(l){n.dead[b]=l;n.cl=[...(s.cl||[0,0])];n.cl[s.turn]++;if(!n.dead.some(d=>!d))n.lost=s.turn}clkMove(n,s)});
 def({id:'exedout',name:'Exed-Out',kind:'Impartial',sfx:'stamp',motif:'tile',isNew:true,noUndo:true,clocked:true,
   blurb:'Tic-tac-toe where both players draw X, on three to five boards at once. Close the last board and you lose.',solved:'yes',
   rules:s=>['There are '+(s&&s.k||3)+' tic-tac-toe boards (3, 4 or 5: choose before the game). Both players draw the same mark, X.',
@@ -472,6 +474,16 @@ def({id:'exedout',name:'Exed-Out',kind:'Impartial',sfx:'stamp',motif:'tile',isNe
   hasMove:s=>s.dead.some(d=>!d),
   ready:s=>!!s.set,
   result:s=>clkResult(s)||(s.lost!=null?{winner:1-s.lost,reason:`${name(s.lost)} made three in a row on the last open board.`,how:`${name(s.lost)} closed the last board`}:null),
+  /* the end card: a word from Play the knight (could the loser have stayed safe?) and who did what */
+  remark:(s,over)=>{
+    const w=over.winner,l=1-w;
+    if(s.flag!=null){const o=exoOpen(s);return`${name(l)} ran out of time with ${o} ${o===1?'board':'boards'} still open.`}
+    const [b,i]=s.lastX,c=[...s.bd[b]];c[i]=0; // the last board just before the losing X
+    const safe=c.filter((v,j)=>!v&&!EXO_LINES.some(L=>L.includes(j)&&L.every(k=>k===j||c[k]))).length;
+    return safe?`${name(l)} closed the last board while ${safe} safe ${safe===1?'square was':'squares were'} still open on it. ${name(w)} takes the game.`
+      :`${name(w)} left ${name(l)} nowhere to go: every square on the last board made three in a row.`;
+  },
+  stats:s=>[{label:'Xs drawn',tone:'good',v:s.xs||[0,0]},{label:'Boards closed',tone:'gold',v:s.cl||[0,0]},{label:'Time used',tone:'',v:[0,1].map(q=>sdkFmt(s.k*60000-s.clock[q]))}],
   render(s,ctx){
     const app=typeof ctx.configure==='function';
     if(app&&!s.set){
@@ -479,8 +491,9 @@ def({id:'exedout',name:'Exed-Out',kind:'Impartial',sfx:'stamp',motif:'tile',isNe
         b.addEventListener('click',()=>{if(s.k!==n)ctx.configure({...clone(s),...exoBoards(n)})});return b};
       return clkPre(s,ctx,[['Boards',k(3),k(4),k(5)]]);
     }
-    const open=exoOpen(s),wrap=el('div',{class:'exo'});
-    if(s.set) wrap.append(el('p',{class:'exo-left'+(open===1?' last':'')},open===1?'Last board: three in a row on it loses':`${open} of ${s.k} boards open`));
+    const open=exoOpen(s),lostB=s.lost!=null&&s.lastX?s.lastX[0]:-1,wrap=el('div',{class:'exo'});
+    const line=s.lost!=null?`${name(s.lost)} closed the last board`:s.flag!=null?`${name(s.flag)} ran out of time`:open===1?'Last board: three in a row on it loses':`${open} of ${s.k} boards open`;
+    if(s.set) wrap.append(el('p',{class:'exo-left'+(open<=1||s.flag!=null?' last':'')},line));
     const row=el('div',{class:'exo-row'});
     s.bd.forEach((c,b)=>{
       const dead=s.dead[b],g=el('div',{class:'exo-g'});
@@ -491,10 +504,10 @@ def({id:'exedout',name:'Exed-Out',kind:'Impartial',sfx:'stamp',motif:'tile',isNe
         if(on) q.addEventListener('click',()=>ctx.play(exoPlay(s,b,i),()=>{q.classList.add('x','stamp');q.textContent='X';return sleep(140)}));
         g.append(q);
       });
-      row.append(el('div',{class:'exo-b'+(dead?' dead':'')},el('span',{class:'exo-n'},dead?`Board ${b+1} · closed`:`Board ${b+1}`),g));
+      row.append(el('div',{class:'exo-b'+(b===lostB?' lose':dead?' dead':'')},el('span',{class:'exo-n'},b===lostB?`Board ${b+1} · the last one`:dead?`Board ${b+1} · closed`:`Board ${b+1}`),g));
     });
     wrap.append(row);
-    ctx.say(open===1?'Only one board is left: whoever makes three in a row on it loses.':`Click an empty square on any open board. Three in a row closes a board; whoever closes the last one loses.`);
+    ctx.say(s.lost!=null||s.flag!=null?line+'.':open===1?'Only one board is left: whoever makes three in a row on it loses.':`Click an empty square on any open board. Three in a row closes a board; whoever closes the last one loses.`);
     return s.set?clkFrame(s,ctx,wrap,app):wrap;
   }});
 
@@ -508,6 +521,9 @@ const HOL_N=6,HOL=(()=>{const rc=[];for(let r=0;r<HOL_N;r++)for(let c=0;c<=r;c++
 const holNext=(s,p)=>s.o.filter(o=>o===p).length+1;
 const holPlace=(s,i)=>nx(s,n=>{n.v[i]=holNext(s,s.turn);n.o[i]=s.turn;n.lastI=i;clkMove(n,s)});
 const holDone=s=>s.v.filter(x=>!x).length<=1;
+/* once the board is done: the hollow (e), each player's numbers touching it (by, smallest first) and their totals (t) */
+const holAround=s=>{const e=s.v.indexOf(0),by=[[],[]];HOL.nb[e].forEach(j=>by[s.o[j]].push(s.v[j]));by.forEach(x=>x.sort((a,b)=>a-b));
+  return{e,by,t:by.map(x=>x.reduce((u,v)=>u+v,0))}};
 def({id:'hollow',name:'Hollow',kind:'Partizan',sfx:'chip',motif:'hex',isNew:true,noUndo:true,clocked:true,
   blurb:'Place your numbers 1 to 10 on a triangle of hexagons. One hexagon stays empty, and the lower total around it wins.',solved:'no',
   rules:['The board is a triangle of 21 hexagons. Each player has the numbers 1 to 10, in their own colour.',
@@ -523,28 +539,47 @@ def({id:'hollow',name:'Hollow',kind:'Partizan',sfx:'chip',motif:'hex',isNew:true
   ready:s=>!!s.set,
   result:s=>{
     const t=clkResult(s);if(t||!holDone(s)) return t;
-    const e=s.v.indexOf(0),by=[[],[]];HOL.nb[e].forEach(j=>by[s.o[j]].push(s.v[j]));
-    const [a,b]=by.map(x=>x.reduce((u,v)=>u+v,0)),sh=q=>by[q].length?`${by[q].sort((x,y)=>x-y).join(' + ')} = ${[a,b][q]}`:'nothing, so 0';
+    const {by,t:[a,b]}=holAround(s),sh=q=>by[q].length?`${by[q].join(' + ')} = ${[a,b][q]}`:'nothing, so 0';
     const why=`Next to the hollow: ${name(0)} ${sh(0)}; ${name(1)} ${sh(1)}.`;
     return a===b?{winner:'draw',reason:`${why} Equal totals: a draw.`,how:`Level at ${a} each next to the hollow`}
       :{winner:a<b?0:1,reason:`${why} The lower total wins.`,how:`${Math.min(a,b)} to ${Math.max(a,b)} next to the hollow`};
+  },
+  /* the end card: a word from Play the knight, and who did what */
+  remark:(s,over)=>{
+    if(!holDone(s)){const q=s.flag,left=11-holNext(s,q);return`${name(q)} ran out of time with ${left} ${left===1?'number':'numbers'} still to place.`}
+    const {by,t}=holAround(s),w=over.winner;
+    if(w==='draw') return`Dead level: ${t[0]} each around the hollow. You two are well matched.`;
+    const l=1-w;
+    return`${name(w)} kept it low, ${t[w]} to ${t[l]} around the hollow.`+(by[l].length?` ${name(l)}’s ${by[l][by[l].length-1]} sat right next to it.`:'');
+  },
+  stats:s=>{
+    const used={label:'Time used',tone:'',v:[0,1].map(q=>sdkFmt(240000-s.clock[q]))};
+    if(!holDone(s)) return[{label:'Numbers placed',tone:'good',v:[0,1].map(q=>holNext(s,q)-1)},{label:'Still to place',tone:'bad',v:[0,1].map(q=>11-holNext(s,q))},used];
+    const {by,t}=holAround(s);
+    return[{label:'Hollow total',tone:'gold',v:t},{label:'Numbers touching',tone:'',v:by.map(x=>x.length)},used];
   },
   render(s,ctx){
     const app=typeof ctx.configure==='function';
     if(app&&!s.set) return clkPre(s,ctx);
     const p=s.turn,z=26,s3=Math.sqrt(3),pad=10,done=holDone(s);
     const W=pad*2+HOL_N*z*s3,H=pad*2+z*(2+1.5*(HOL_N-1)),X=(r,c)=>W/2+(c-r/2)*z*s3,Y=r=>pad+z+1.5*z*r;
-    const svg=sv('svg',{viewBox:`0 0 ${W.toFixed(1)} ${H.toFixed(1)}`,class:'svgb hol',style:`--mw:${Math.round(W*1.7)}px`});
-    const hole=done?s.v.indexOf(0):-1,near=hole>=0?new Set(HOL.nb[hole]):null;
+    const pts=(i,rz)=>{const [r,c]=HOL.rc[i];return[270,330,30,90,150,210].map(a=>{const t=a*Math.PI/180;return(X(r,c)+rz*Math.cos(t)).toFixed(1)+','+(Y(r)+rz*Math.sin(t)).toFixed(1)}).join(' ')};
+    const svg=sv('svg',{viewBox:`0 0 ${W.toFixed(1)} ${H.toFixed(1)}`,class:'svgb hol'});
+    const hole=done?s.v.indexOf(0):-1;
     HOL.rc.forEach(([r,c],i)=>{
-      const v=s.v[i],o=s.o[i],pts=[270,330,30,90,150,210].map(a=>{const t=a*Math.PI/180;return(X(r,c)+z*Math.cos(t)).toFixed(1)+','+(Y(r)+z*Math.sin(t)).toFixed(1)}).join(' ');
-      const poly=sv('polygon',{points:pts,class:'hexcell'+(v?' h'+PC[o]:'')+(i===hole?' hole':'')+(near&&near.has(i)?' near':'')+(i===s.lastI&&!done?' last':'')});
+      const v=s.v[i],o=s.o[i];
+      const poly=sv('polygon',{points:pts(i,z),class:'hexcell'+(v?' h'+PC[o]:'')+(i===hole?' hole':'')});
       svg.append(poly);
       if(v) svg.append(sv('text',{x:X(r,c).toFixed(1),y:Y(r).toFixed(1),class:'hol-v'},String(v)));
       else if(ctx.live&&!done){poly.classList.add('ok','t'+p);act(poly,()=>ctx.play(holPlace(s,i),()=>{poly.classList.add('h'+PC[p],'stamp');return sleep(120)}),`Hexagon ${i+1}: place your ${holNext(s,p)}`)}
     });
-    ctx.say(done?null:`${name(p)}: click an empty hexagon to place your ${holNext(s,p)}. The last empty hexagon decides it: the lower total around it wins.`);
-    return s.set?clkFrame(s,ctx,svg,app,q=>el('span',{class:'hol-next'},holNext(s,q)<=10?`next ${holNext(s,q)}`:'all placed')):svg;
+    /* outlines go on top, just inside each hexagon, so the neighbours drawn after never cover them */
+    const ring=(i,k)=>svg.append(sv('polygon',{points:pts(i,z-3),class:'hol-ring '+k}));
+    if(done){ring(hole,'hole');HOL.nb[hole].forEach(i=>ring(i,'near'))}else if(s.lastI!=null&&s.v[s.lastI])ring(s.lastI,'last');
+    const box=el('div',{class:'hol-box',style:`--mw:${Math.round(W*1.7)}px`},svg);
+    if(done){const {t}=holAround(s);box.append(el('p',{class:'hol-sum'},'Around the hollow: ',el('b',{class:'p0'},`${name(0)} ${t[0]}`),' · ',el('b',{class:'p1'},`${name(1)} ${t[1]}`)))}
+    ctx.say(done?'The hollow is outlined in gold, and the numbers around it decide the game.':s.flag!=null?`${name(s.flag)} ran out of time.`:`${name(p)}: click an empty hexagon to place your ${holNext(s,p)}. The last empty hexagon decides it: the lower total around it wins.`);
+    return s.set?clkFrame(s,ctx,box,app,q=>holNext(s,q)<=10?el('span',{class:'hol-next'},'next ',el('b',{},String(holNext(s,q)))):null):box;
   }});
 
 /* ---------------- graph colouring ---------------- */
