@@ -129,7 +129,7 @@ const Online=(()=>{
   /* op, when given, re-applies this move on top of a newer state, so two moves made at the same
      moment (rapid fire) are merged instead of one being lost */
   function push(kind,op){
-    if(!st.on||applying||!ref) return;
+    if(!st.on||applying||!ref||(S.game&&S.game.solo)) return; // a one-player game (Candy Words) stays on this device
     const m=id,base=seq,data=snap(),tok=uid+':'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);lastTok=tok;lastData=data;
     let before=null; // the position this write follows, for the log
     ref.transaction(r=>{

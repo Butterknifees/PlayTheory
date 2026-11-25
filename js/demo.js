@@ -53,14 +53,16 @@ const Demo=(()=>{
     if(document.hidden){timer=setTimeout(()=>step(my),1000);return}
     const o=outcome(st);
     if(o){
-      say(o.winner==='draw'?null:o.winner,o.winner==='draw'?'A draw. Watch again…':`${name(o.winner)} wins${o.reason?'':`. ${name(1-o.winner)} has no move left`}.`);
+      if(game.solo) say(null,'Time’s up. Watch again…');
+      else say(o.winner==='draw'?null:o.winner,o.winner==='draw'?'A draw. Watch again…':`${name(o.winner)} wins${o.reason?'':`. ${name(1-o.winner)} has no move left`}.`);
       timer=setTimeout(()=>reset(my),3000);return;
     }
     const mover=st.turn,next=choose(st);
     if(!next){timer=setTimeout(()=>reset(my),2000);return}
     const nextNode=draw(next);
     mark(box.firstElementChild,nextNode);
-    say(mover,`${name(mover)} moves`+(next.turn===mover?' and goes again':''));
+    if(game.demoSay) say(game.solo?null:mover,game.demoSay(st,next)); // one-player games say what the move did
+    else say(mover,`${name(mover)} moves`+(next.turn===mover?' and goes again':''));
     timer=setTimeout(()=>{
       if(my!==run) return;
       box.replaceChildren(nextNode);fitBox(box);

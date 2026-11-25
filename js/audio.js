@@ -45,6 +45,7 @@ const THEMES={
   sliding:    {m:'Coin Slide',bpm:120,root:72,sc:'major',prog:[0,3,4,0],lead:'chip',dens:.5,arp:'chip',bass:'soft',bp:K4,dr:{k:K4,h:H8}},
   cutthroat:  {m:'Constellations',bpm:72,root:64,sc:'lydian',prog:[0,4,5,1],lead:'glass',dens:.3,pad:'choir'},
   duosudoku:  {m:'Number Duel',bpm:100,root:62,sc:'major',prog:[0,3,4,5],lead:'musicbox',dens:.5,pad:'glass',bass:'soft',bp:K4,dr:{c:H8,w:'....x.......x...'}},
+  candywords: {m:'Sugar Rush',bpm:118,root:72,sc:'major',prog:[0,5,3,4],lead:'marimba',dens:.55,pad:'glass',bass:'pluck',bp:'x..x..x.x..x..x.',dr:{k:K4,c:H8,w:'....x.......x...'},swing:.12},
   to15:       {m:'Magic Square',bpm:96,root:69,sc:'harmonic',prog:[0,5,3,4],lead:'musicbox',dens:.45,pad:'glass',bass:'soft',bp:K4,dr:{c:OFF}}
 };
 

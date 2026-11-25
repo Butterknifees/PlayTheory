@@ -1,6 +1,6 @@
 # PlayTheory
 
-> PlayTheory (playtheoryhq.com, also called PlayTheory HQ) is a free website of two-player strategy games that run in the browser. The games available now are DuSoKu, a two-player sudoku; Amazons, a board game of moving queens and flaming arrows; Exed-Out, tic-tac-toe on several boards where both players draw X; and Hollow, a numbers game on a triangle of hexagons. Random mode deals one game after another at random and keeps score across the run. No sign-up and nothing to install.
+> PlayTheory (playtheoryhq.com, also called PlayTheory HQ) is a free website of two-player strategy games that run in the browser. The games available now are DuSoKu, a two-player sudoku; Amazons, a board game of moving queens and flaming arrows; Exed-Out, tic-tac-toe on several boards where both players draw X; and Hollow, a numbers game on a triangle of hexagons. Candy Words is a daily word puzzle for one player. Random mode deals one game after another at random and keeps score across the run. No sign-up and nothing to install.
 
 ## DuSoKu
 
@@ -27,6 +27,12 @@
 - A triangle of 21 hexagons. Players take turns placing their numbers 1 to 10, in order.
 - One hexagon stays empty. The player whose numbers around it add up to less wins; equal totals draw.
 - Each player has 4 minutes on a chess clock.
+
+## Candy Words
+
+- A daily word puzzle for one player, played like a match-three game: an 8×8 board of letter tiles, each worth points.
+- Swap two tiles side by side to spell a word of 4 letters or more, across or down. The word clears, new letters fall, and words that form as they land score double, then triple.
+- Everyone gets the same board each day and has 7 minutes 30 seconds.
 
 ## Pages
 

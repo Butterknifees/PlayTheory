@@ -41,12 +41,12 @@ const ctx={
 
 function celebrate(){
   const w=S.over.winner;
-  Account.result(S.over); // saved for a signed-in player
+  if(!S.game.solo) Account.result(S.over); // saved for a signed-in player (two-player games only)
   if(S.over.daily) Daily.done(S.state,S.over); // the pair's time goes on today's leaderboard
   Rating.result(S.state,S.over); // online between two signed-in players: new ratings
   if(w==='draw'){Sound.fx('draw');return}
   Sound.fx('win',{id:S.gid}); // Play the knight bows inside the end card (resultCard)
-  FX.confetti([FX.color(PC[w]),FX.cssVar('--brand-blue'),'#ffffff',w===0?'#9cc3ea':'#7d7d7d']);
+  FX.confetti(S.game.colors||[FX.color(PC[w]),FX.cssVar('--brand-blue'),'#ffffff',w===0?'#9cc3ea':'#7d7d7d']);
 }
 
 function renderInfo(){
@@ -101,7 +101,8 @@ function renderPlay(moved){
     const nxt=el('button',{class:'btn primary',type:'button',style:'margin-left:0'},'Choose another game');nxt.addEventListener('click',goHome);
     const show=el('button',{class:'btn',type:'button'},'Show result');show.addEventListener('click',()=>{resShut=null;renderPlay()});
     if(over.daily) again.textContent='Play again (practice)';
-    res.replaceChildren(el('div',{},el('b',{},resTitle(w)),el('p',{},pn(over.reason))),el('div',{class:'row'},show,again,nxt));
+    if(over.again) again.textContent=over.again;
+    res.replaceChildren(el('div',{},el('b',{},resTitle(w,over)),el('p',{},pn(over.reason))),el('div',{class:'row'},show,again,nxt));
   }else res.hidden=true;
   S.hint=null;
   const board=$('board');
@@ -113,6 +114,7 @@ function renderPlay(moved){
   $('hint').textContent=waiting?`Waiting for ${name(s.turn)} to move…`:touchify(pn(S.hint??S.game.how),board.querySelector('[data-hov]'));
   $('undo').disabled=!started||S.busy||!Online.mayUndo()||!!S.game.noUndo;
   $('undo').hidden=!!S.game.noUndo;
+  $('restart').hidden=!!S.game.solo; // one board a day: Play again lives on the end card
   if(S.entering){S.entering=false;enterBoard()}
 }
 
@@ -148,7 +150,7 @@ function openLook(){
 /* the end card over the board: who won and how, the rating change, a word from Play the knight, who did what, and
    what next. × (or a tap outside it) puts it away to look at the final board; Show result brings it back. */
 let resShut=null,resPose=null;
-const resTitle=w=>w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You won!':`${name(w)} won`;
+const resTitle=(w,over)=>over&&over.title||(w==='draw'?'It’s a draw':Online.on&&w===Online.me?'You won!':`${name(w)} won`);
 function resultCard(res,s,over){
   const w=over.winner,g=S.game;
   res.hidden=false;res.className='res-pop'+(w==='draw'?' draw':' w'+w);
@@ -167,18 +169,18 @@ function resultCard(res,s,over){
      In Random mode the next game leads, and the run's score sits under the title */
   const rv=typeof Review!=='undefined'&&Review.can(s);
   const ranks=typeof Rating!=='undefined'&&Rating.rates(S.gid)?btn('Player rankings',()=>Rating.open(Rating.poolOf(s))):null;
-  const main=s.rnd?btn('Next game',nextRandom,'btn primary big'):rv?btn('Game review',()=>Review.open(s),'btn primary big'):over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn('Play again',again,'btn primary big');
+  const main=s.rnd?btn('Next game',nextRandom,'btn primary big'):rv?btn('Game review',()=>Review.open(s),'btn primary big'):over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn(over.again||'Play again',again,'btn primary big');
   const second=over.daily?btn('Play again (practice)',again):ranks||btn('Look at the board',shut);
   const third=rv?s.rnd?btn('Game review',()=>Review.open(s)):over.daily?btn('Leaderboard',()=>Daily.open(s.day)):btn('Play again',again):null;
   const run=s.rnd?rndTally(s.rnd,over):null;
   res.replaceChildren(el('div',{class:'res-card',role:'dialog','aria-modal':'false','aria-labelledby':'resT'},x,
-    el('div',{class:'res-head'},el('h2',{id:'resT'},resTitle(w)),el('p',{},pn(over.how||over.reason))),
+    el('div',{class:'res-head'},el('h2',{id:'resT'},resTitle(w,over)),el('p',{},pn(over.how||over.reason))),
     run?el('p',{class:'res-run'},`Random mode, after ${s.rnd.k} ${s.rnd.k===1?'game':'games'}: `,el('b',{},`${name(0)} ${run.w[0]} – ${run.w[1]} ${name(1)}`),run.d?` (${run.d} drawn)`:''):null,
     elo,
     el('div',{class:'res-coach'},resPose.node,el('p',{class:'res-say'},pn(say))),
-    tiles.length?el('div',{class:'res-who'},...[0,1].map(p=>el('span',{class:'p'+p},el('i',{class:'dot'}),name(p)))):null,
+    tiles.length&&!g.solo?el('div',{class:'res-who'},...[0,1].map(p=>el('span',{class:'p'+p},el('i',{class:'dot'}),name(p)))):null,
     tiles.length?el('div',{class:'res-tiles'},...tiles.map(t=>el('div',{class:'res-tile '+t.tone},
-      el('div',{class:'vs'},el('b',{class:'v0'},String(t.v[0])),el('b',{class:'v1'},String(t.v[1]))),el('small',{},t.label)))):null,
+      el('div',{class:'vs'},...t.v.map((v,i)=>el('b',{class:'v'+i},String(v)))),el('small',{},t.label)))):null,
     el('div',{class:'res-go'},main,el('div',{class:'row'+(third?' three':'')},third,second,btn('All games',goHome)))));
   res.onclick=e=>{if(e.target===res)shut()};
 }
@@ -187,7 +189,7 @@ function resultCard(res,s,over){
 function enterBoard(){
   const b=$('board');if(reduceMotion()) return;
   b.classList.remove('entering');void b.offsetWidth;b.classList.add('entering');
-  b.querySelectorAll('.ctr,.stone,.tile,.dom,.pin,.bite,.cherry,.card15,.queen,.hexcell,.gv,.edge,.star,.ecard,.dl,.sq').forEach((e,i)=>{e.style.setProperty('--pd',Math.min(i*16,900)+'ms');e.classList.add('popin')});
+  b.querySelectorAll('.ctr,.stone,.tile,.dom,.pin,.bite,.cherry,.card15,.queen,.hexcell,.gv,.edge,.star,.ecard,.dl,.sq,.cw-t').forEach((e,i)=>{e.style.setProperty('--pd',Math.min(i*16,900)+'ms');e.classList.add('popin')});
   setTimeout(()=>b.classList.remove('entering'),800);
 }
 
@@ -218,7 +220,7 @@ function enterGame(){
   S.entering=true;renderPlay();
   $('howBtn').classList.toggle('nudge',!S.sawHow);
   /* playing someone on another device: offer the link or room straight away */
-  if(S.remote&&!Online.on) setTimeout(()=>{if(!Online.on&&document.body.dataset.view==='play')Online.open()},650);
+  if(S.remote&&!Online.on&&!S.game.solo) setTimeout(()=>{if(!Online.on&&document.body.dataset.view==='play')Online.open()},650);
 }
 
 function updateNowPlaying(){
@@ -245,10 +247,10 @@ function startGame(id,seed){if(!playable(id)){goHome();return}closeSheet();S.saw
    chosen once; s.rnd {w: wins each, d: draws, k: game number} rides along in every game's state, so both devices online
    keep the same score, and whoever taps Next game deals the next one for both. Who moves first alternates */
 const rndTally=(r,over)=>{const w=[...r.w];let d=r.d;if(over){if(over.winner==='draw')d++;else w[over.winner]++}return{w,d}};
-function startRandom(){S.starter=0;startGame(pick([...PLAYABLE]),{rnd:{w:[0,0],d:0,k:1}});try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}}
+function startRandom(){S.starter=0;startGame(pick(duels()),{rnd:{w:[0,0],d:0,k:1}});try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){}}
 function nextRandom(){
   const s=S.state,r=s&&s.rnd;if(!r) return;
-  S.starter=r.k%2;startGame(pick([...PLAYABLE]),{vs:s.vs||0,rnd:{...rndTally(r,S.over),k:r.k+1}});
+  S.starter=r.k%2;startGame(pick(duels()),{vs:s.vs||0,rnd:{...rndTally(r,S.over),k:r.k+1}});
 }
 
 /* ---------- home: a card for every game ---------- */
@@ -256,8 +258,10 @@ const FILTERS=[['all','All games'],['new','New'],['Partizan',KIND.Partizan],['Im
 let filter='all',previewObs=null;
 const FEATURED='duosudoku';
 /* only these games are open for now; every other card says Coming soon and cannot be started */
-const PLAYABLE=new Set([FEATURED,'amazons','exedout','hollow']);
+const PLAYABLE=new Set([FEATURED,'amazons','exedout','hollow','candywords']);
 const playable=id=>PLAYABLE.has(id);
+/* the two-player ones (Random mode deals only these; Candy Words is for one) */
+const duels=()=>[...PLAYABLE].filter(id=>!(GAMES.find(g=>g.id===id)||{}).solo);
 function view(v){
   const home=v==='home';
   $('home').hidden=!home;$('table').hidden=home;$('crumb').hidden=home;
@@ -271,7 +275,7 @@ function setRoute(id){
 function goHome(){
   Mascot.hide();closeSheet();Demo.stop();Music.stop();
   const intro=$('intro');intro.hidden=true;intro.classList.remove('playing');
-  view('home');setRoute(null);updateNowPlaying();Daily.card();
+  view('home');setRoute(null);updateNowPlaying();Daily.card();cwCard();
   try{window.scrollTo({top:0})}catch(e){}
   requestAnimationFrame(()=>document.querySelectorAll('.gprev.drawn').forEach(fitPreview));
 }
@@ -321,7 +325,7 @@ function buildFeatured(){
 function buildRandom(){
   const box=$('rndCard');if(!box||box.firstChild) return;
   const go=el('button',{class:'btn primary',type:'button'},'Start Random mode');go.addEventListener('click',()=>{Sound.unlock();startRandom()});
-  const n=GAMES.filter(g=>playable(g.id)).map(g=>g.name),names=n.length>1?n.slice(0,-1).join(', ')+' or '+n[n.length-1]:n[0];
+  const n=GAMES.filter(g=>playable(g.id)&&!g.solo).map(g=>g.name),names=n.length>1?n.slice(0,-1).join(', ')+' or '+n[n.length-1]:n[0];
   box.replaceChildren(el('div',{class:'daily-txt'},
     el('div',{class:'gmeta'},el('span',{class:'chip new'},'New'),el('span',{class:'chip'},'A run of games')),
     el('h3',{},'Random mode'),
@@ -329,7 +333,7 @@ function buildRandom(){
     el('div',{class:'daily-go'},go));
 }
 function buildHome(){
-  buildRandom();
+  buildRandom();cwCard();
   const f=$('filters');
   f.replaceChildren(...FILTERS.map(([k,label])=>{
     const b=el('button',{class:'fchip',type:'button','aria-pressed':String(k===filter)},label);
