@@ -43,6 +43,7 @@ function celebrate(){
   const w=S.over.winner;
   if(!S.game.solo) Account.result(S.over); // saved for a signed-in player (two-player games only)
   if(S.over.daily) Daily.done(S.state,S.over); // the pair's time goes on today's leaderboard
+  if(S.game.done) S.game.done(S.state,S.over); // a game's own end (Candy Words opens its leaderboard)
   Rating.result(S.state,S.over); // online between two signed-in players: new ratings
   if(w==='draw'){Sound.fx('draw');return}
   Sound.fx('win',{id:S.gid}); // Play the knight bows inside the end card (resultCard)
@@ -169,9 +170,10 @@ function resultCard(res,s,over){
      In Random mode the next game leads, and the run's score sits under the title */
   const rv=typeof Review!=='undefined'&&Review.can(s);
   const ranks=typeof Rating!=='undefined'&&Rating.rates(S.gid)?btn('Player rankings',()=>Rating.open(Rating.poolOf(s))):null;
-  const main=s.rnd?btn('Next game',nextRandom,'btn primary big'):rv?btn('Game review',()=>Review.open(s),'btn primary big'):over.daily?btn('Today’s leaderboard',()=>Daily.open(s.day),'btn primary big'):btn(over.again||'Play again',again,'btn primary big');
-  const second=over.daily?btn('Play again (practice)',again):ranks||btn('Look at the board',shut);
-  const third=rv?s.rnd?btn('Game review',()=>Review.open(s)):over.daily?btn('Leaderboard',()=>Daily.open(s.day)):btn('Play again',again):null;
+  const lb=g.board?()=>g.board(s):over.daily?()=>Daily.open(s.day):null; // a daily puzzle's leaderboard
+  const main=s.rnd?btn('Next game',nextRandom,'btn primary big'):rv?btn('Game review',()=>Review.open(s),'btn primary big'):lb?btn('Today’s leaderboard',lb,'btn primary big'):btn(over.again||'Play again',again,'btn primary big');
+  const second=lb?btn(over.again||'Play again (practice)',again):ranks||btn('Look at the board',shut);
+  const third=rv?s.rnd?btn('Game review',()=>Review.open(s)):lb?btn('Leaderboard',lb):btn('Play again',again):null;
   const run=s.rnd?rndTally(s.rnd,over):null;
   res.replaceChildren(el('div',{class:'res-card',role:'dialog','aria-modal':'false','aria-labelledby':'resT'},x,
     el('div',{class:'res-head'},el('h2',{id:'resT'},resTitle(w,over)),el('p',{},pn(over.how||over.reason))),

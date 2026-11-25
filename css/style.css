@@ -1093,3 +1093,10 @@ button.cw-t:focus-visible{outline:3px solid var(--ink);outline-offset:1px}
 .cw-card .btn.primary{background:#c2185b;border-color:#c2185b}
 @media (max-width:600px){.cw-card .cw-mini{display:none}}
 @media (prefers-reduced-motion:reduce){.cw-t,.cw-t.drop,.cw-t.hit,.cw-grid.mix .cw-t,.cw-float,.cw-banner{animation-duration:.01ms;transition-duration:.01ms}}
+/* Candy Words leaderboard (2026-11-25): top score, best word, most words */
+.cw-by{flex-wrap:wrap}
+.cw-by .seg[aria-pressed="true"]{background:#c2185b;border-color:#c2185b}
+.cw-you{margin:0;padding:8px 10px;border-radius:8px;background:#fdebf3;font-size:14px}
+.cw-lb .lb-t b{font-family:var(--f-display);font-weight:900}
+.cw-lbnote{font-size:14px;padding:8px 10px;border-radius:8px;background:#fdebf3}
+.cw-lbnote .linkish{font-weight:700}

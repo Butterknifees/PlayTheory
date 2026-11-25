@@ -69,17 +69,23 @@ function cwResolve(s,b){
   }
   return{waves,b,dr};
 }
-/* no swap left that spells anything: shuffle (the same way for everyone), or deal fresh letters if shuffling can't help */
+/* change a letter in every word on the board until none is left (the board must start each turn with no word on it) */
+const cwFix=(b,r)=>{for(let t=0;t<400;t++){const ws=cwFind(b);if(!ws.length)return;ws.forEach(x=>{b[x.cells[r()*x.cells.length|0]]=cwPick(r())})}};
+/* no swap left that spells anything: shuffle (the same way for everyone), or deal fresh letters if shuffling can't help.
+   Each try has its words fixed first, so almost every one works; the last resort keeps going until one does */
 function cwMix(day,n,b){
-  for(let t=0;t<80;t++){const r=seeded(cwHash(day,'mix',n,t)),m=t<50?shuffle([...b],r):b.map(()=>cwPick(r()));if(!cwFind(m).length&&cwAny(m))return m}
-  return b;
+  for(let t=0;;t++){
+    const r=seeded(cwHash(day,'mix',n,t)),m=t<30?shuffle([...b],r):b.map(()=>cwPick(r()));
+    cwFix(m,r);if(!cwFind(m).length&&cwAny(m)) return m;
+    if(t>=500) return cwFind(m).length?b:m; // never reached in testing; stops a broken word list from hanging the page
+  }
 }
 /* the day's board: no word on it to start with, and at least one swap that spells one. Without the word list (previews)
    it's just the letters */
 function cwDeal(day){
   const r=seeded(cwHash(day,'board')),b=Array.from({length:CW_N*CW_N},()=>cwPick(r()));
   if(!cwDict) return b;
-  for(let t=0;t<400;t++){const ws=cwFind(b);if(!ws.length)break;ws.forEach(x=>{b[x.cells[r()*x.cells.length|0]]=cwPick(r())})}
+  cwFix(b,r);
   return cwAny(b)?b:cwMix(day,0,b);
 }
 function cwMove(s,i,j){
@@ -92,13 +98,89 @@ const cwLeft=s=>s.set?Math.max(0,CW_TIME-(Date.now()-s.t0)):CW_TIME;
 const cwBest=s=>s.words.reduce((a,w)=>!a||w[1]>a[1]?w:a,null);
 const cwChain=s=>Math.max(1,...s.words.map(w=>w[2]));
 
-/* the day's first finished game on this device is the day's score; later ones are practice */
+/* the day's first finished game on this device is the day's score (and the one that goes on the leaderboard); later ones
+   are practice. localStorage pt-candywords: {day, score, w (words), bw (best word), bp (its points), best, on (uid it was
+   saved for)} */
 const CW_KEY='pt-candywords';
 const cwRec=day=>{try{const r=JSON.parse(localStorage.getItem(CW_KEY)||'null');return r&&r.day===day?r:null}catch(e){return null}};
+const cwKeep=r=>{try{localStorage.setItem(CW_KEY,JSON.stringify(r))}catch(e){}};
 function cwFinish(s){
-  const n=clone(s),r=cwRec(s.day);n.end=1;n.first=r?0:1;n.today=r?r.score:s.score;
-  try{localStorage.setItem(CW_KEY,JSON.stringify({day:s.day,score:n.today,best:Math.max(s.score,r&&r.best||0)}))}catch(e){}
+  const n=clone(s),r=cwRec(s.day),b=cwBest(s);n.end=1;n.first=r?0:1;n.today=r?r.score:s.score;
+  cwKeep({...(r||{day:s.day,score:s.score,w:s.words.length,bw:b?b[0]:'',bp:b?b[1]:0}),best:Math.max(s.score,r&&r.best||0)});
   return n;
+}
+
+/* ---------- today's leaderboard (owner, 2026-11-25): top score, best word, most words ----------
+   words/<day>/<uid>: {n name, sc score, w words, bw best word, bp its points, at}, written once per Google account per day
+   (database.rules.json) and only from the day's first game on this device, so practice games never go on it. Anyone
+   signed in can read it (opening it signs in anonymously). It connects only when opened, never during a game */
+const CW_BOARDS=[['sc','Top score'],['bp','Best word'],['w','Most words']];
+const CW_PITCH={title:'Get on today’s leaderboard',text:'Sign in with Google to put your Candy Words score on today’s leaderboard. It saves your other games too.'};
+const cwLb={day:'',by:'sc',q:null,rows:null,err:'',note:null,n:0};
+const cwUid=()=>{const u=window.firebase&&firebase.apps.length&&firebase.auth().currentUser;return u&&!u.isAnonymous?u.uid:null};
+async function cwSave(day){
+  const rec=cwRec(day);if(!rec||!Account.signedIn) return;
+  try{
+    await Online.connect();const uid=cwUid();if(!uid||rec.on===uid) return;
+    cwLb.note={day,text:'Saving your score…'};cwPanel();
+    const ref=firebase.database().ref('words/'+day+'/'+uid);
+    if((await ref.get()).exists()) cwLb.note={day,text:'This account is already on the board for that day: only the first game counts.'};
+    else{
+      await ref.set({n:String(Account.name||name(0)).slice(0,40),sc:rec.score,w:rec.w||0,bw:String(rec.bw||'').slice(0,9),bp:Math.min(rec.bp||0,rec.score),at:firebase.database.ServerValue.TIMESTAMP});
+      cwLb.note={day,text:'Your score is on the board.'};
+    }
+    cwKeep({...rec,on:uid});
+  }catch(e){cwLb.note={day,text:'Could not save your score: '+(e.message||e)}}
+  cwPanel();
+}
+async function cwWatch(){
+  if(cwLb.q){cwLb.q.off();cwLb.q=null}
+  cwLb.rows=null;cwLb.err='';const n=++cwLb.n,by=cwLb.by;
+  try{await Online.connect()}catch(e){cwLb.err='Could not reach the leaderboard: '+(e.message||e);cwPanel();return}
+  if(n!==cwLb.n) return;
+  cwLb.q=firebase.database().ref('words/'+cwLb.day).orderByChild(by).limitToLast(50);
+  cwLb.q.on('value',v=>{const a=[];v.forEach(c=>{a.push({id:c.key,...c.val()})});
+    a.sort((x,y)=>(Number(y[by])||0)-(Number(x[by])||0)||(Number(x.at)||0)-(Number(y.at)||0));cwLb.rows=a.slice(0,50);cwPanel()},
+    ()=>{cwLb.err='Could not load the leaderboard. Try again in a moment.';cwPanel()});
+}
+function cwPanel(){
+  const box=document.getElementById('cwBody'),dl=document.getElementById('cwDlg');if(!box||!dl.open) return;
+  const today=sdkDay(),day=cwLb.day,by=cwLb.by,me=cwUid(),rec=cwRec(day),kids=[];
+  const seg=(label,on,f)=>{const b=el('button',{class:'seg',type:'button','aria-pressed':String(on)},label);b.addEventListener('click',f);return b};
+  kids.push(el('h2',{},'Candy Words leaderboard'),
+    el('div',{class:'lb-tabs',role:'group','aria-label':'Which day'},seg('Today',day===today,()=>cwOpen(today,by)),seg('Yesterday',day!==today,()=>cwOpen(sdkDay(sdkNow()-DAY),by))),
+    el('div',{class:'lb-tabs cw-by',role:'group','aria-label':'Ranked by'},...CW_BOARDS.map(([k,l])=>seg(l,by===k,()=>cwOpen(day,k)))),
+    el('p',{class:'fine'},`${sdkDayName(day)}. Each player’s first game of the day.`));
+  if(rec) kids.push(el('p',{class:'cw-you'},el('b',{},'Your game: '),`${rec.score} points · ${rec.w??'–'} words`+(rec.bw?` · best word ${rec.bw.toUpperCase()} (${rec.bp})`:'')));
+  if(cwLb.note&&cwLb.note.day===day) kids.push(el('p',{class:'lb-note',role:'status'},cwLb.note.text));
+  else if(!Account.signedIn&&(rec||day===today)){
+    const b=el('button',{class:'linkish',type:'button'},'Sign in with Google');b.addEventListener('click',()=>{cwClose();Account.open(()=>cwOpen(day,by),CW_PITCH)});
+    kids.push(el('p',{class:rec?'lb-note':'fine'},b,rec?' to put your score on the board.':' to be listed when you play.'));
+  }
+  const val=r=>by==='bp'?[String(r.bw||'').toUpperCase()||'–',`${Number(r.bp)||0} points`]:by==='w'?[`${Number(r.w)||0} words`,`${Number(r.sc)||0} points`]:[String(Number(r.sc)||0),`${Number(r.w)||0} words`];
+  if(cwLb.err) kids.push(el('p',{class:'net-err',role:'alert'},cwLb.err));
+  else if(!cwLb.rows) kids.push(el('p',{class:'net-wait'},el('span',{class:'spin','aria-hidden':'true'}),'Loading…'));
+  else if(!cwLb.rows.length) kids.push(el('p',{},day===today?'Nobody is on today’s board yet. Be the first!':'Nobody was on the board that day.'));
+  else kids.push(el('ol',{class:'lb cw-lb'},...cwLb.rows.map((r,i)=>{const [v,sub]=val(r);
+    return el('li',{class:'lb-row'+(me&&r.id===me?' me':'')},el('span',{class:'lb-n'},String(i+1)),el('span',{class:'lb-pair'},el('span',{class:'w'},String(r.n||'Player'))),
+      el('span',{class:'lb-t'},el('b',{},v),el('small',{},sub)))})));
+  if(me&&cwLb.rows&&cwLb.rows.length>=50&&!cwLb.rows.some(r=>r.id===me)&&rec&&rec.on===me) kids.push(el('p',{class:'fine'},'Your game is further down than the top 50.'));
+  kids.push(el('p',{class:'fine'},`A new board comes at midnight IST, in ${sdkUntil()}.`));
+  const playing=document.body.dataset.view==='play'&&S.gid==='candywords'&&S.state&&S.state.set&&!S.over;
+  if(day===today&&!playing&&!(S.gid==='candywords'&&S.over)){const go=el('button',{class:'btn primary big',type:'button'},cwRec(today)?'Play again (practice)':'Play today’s puzzle');go.addEventListener('click',()=>{cwClose();Sound.unlock();startGame('candywords')});kids.push(go)}
+  const x=el('button',{class:'dlg-x',type:'button','aria-label':'Close'},'×');x.addEventListener('click',cwClose);
+  box.replaceChildren(x,...kids);
+}
+function cwOpen(day=sdkDay(),by='sc'){
+  cwLb.day=day;cwLb.by=by;
+  const dl=document.getElementById('cwDlg');if(!dl.open){try{dl.showModal()}catch(e){dl.setAttribute('open','')}}
+  cwWatch();cwPanel();cwSave(day);
+}
+function cwClose(){const dl=document.getElementById('cwDlg');if(dl&&dl.open){try{dl.close()}catch(e){dl.removeAttribute('open')}}}
+if(typeof document!=='undefined'&&document.getElementById('cwDlg')){
+  const dl=document.getElementById('cwDlg');
+  dl.addEventListener('click',e=>{if(e.target===dl)cwClose()});
+  dl.addEventListener('close',()=>{if(cwLb.q){cwLb.q.off();cwLb.q=null}cwLb.n++});
 }
 
 /* ---------- the board ---------- */
@@ -127,11 +209,13 @@ function cwPre(s,ctx){
     const day=sdkDay();ctx.configure({...clone(s),day,b:cwDeal(day),dr:Array(CW_N).fill(0),set:1,t0:Date.now()});
   });
   ctx.say(ready?'Tap Start when you’re ready: the clock starts straight away.':'Loading the word list…');
+  const lb=el('button',{class:'linkish',type:'button'},'See today’s leaderboard');lb.addEventListener('click',()=>cwOpen());
   return el('div',{class:'cw'},el('div',{class:'sdk-setup big cw-pre'},
     el('div',{class:'cw-mini','aria-hidden':'true'},...'WORDS'.split('').map(c=>el('span',{class:'cw-t '+cwTone(c.toLowerCase())},el('b',{},c),el('small',{},String(CW_PTS[c.toLowerCase()]))))),
     el('h3',{},'Today’s Candy Words'),
     el('p',{class:'fine'},`${sdkDayName(sdkDay())} · the same board for everyone`),
     el('p',{},'Swap two tiles side by side to spell a word of 4 letters or more, across or down. Long words multiply, and words that form as the tiles fall score double, then triple.'),
+    el('p',{class:'cw-lbnote'},el('b',{},'Today’s leaderboard'),' ranks the top score, the best word and the most words. Your first game of the day goes on it',Account.signedIn?'.':' when you sign in with Google.',' ',lb),
     rec?el('p',{class:'cw-today'},'Your score today: ',el('b',{},String(rec.score)),'. Play again for practice: only your first game counts.'):null,
     el('p',{class:'fine'},`You have 7 minutes 30 seconds. A new board comes at midnight IST, in ${sdkUntil()}.`),
     cwErr?el('p',{class:'net-err',role:'alert'},cwErr):null,go));
@@ -240,7 +324,10 @@ def({id:'candywords',name:'Candy Words',kind:'Solo',sfx:'pop',motif:'tile',isNew
     const k=cwChain(s);
     return`Your best word was ${b[0].toUpperCase()} for ${b[1]} points.`+(k>1?` Your longest chain ran to ×${k}.`:' Words that form as the tiles fall score double, so try swaps near the bottom.');
   },
-  stats:s=>[{label:'Points',tone:'gold',v:[s.score]},{label:'Words',tone:'good',v:[s.words.length]},{label:'Longest word',tone:'',v:[Math.max(0,...s.words.map(w=>w[0].length))]}],
+  stats:s=>{const b=cwBest(s);return[{label:'Points',tone:'gold',v:[s.score]},{label:'Words',tone:'good',v:[s.words.length]},{label:b?'Best: '+b[0].toUpperCase():'Best word',tone:'',v:[b?b[1]:0]}]},
+  /* the end card leads with today's leaderboard, and after the day's first game it opens by itself once the cheering is done */
+  board:s=>cwOpen(s.day),
+  done:s=>{if(s.first)setTimeout(()=>{if(S.over&&S.state===s&&document.body.dataset.view==='play')cwOpen(s.day)},2400)},
   /* "Watch a round": the best swap each time, for six swaps */
   demoMove:s=>{
     if(!cwDict){cwLoad().catch(()=>{});return null}
@@ -267,13 +354,14 @@ function cwCard(){
   const d=sdkDay(),rec=cwRec(d),k=d+':'+(rec?rec.score:'');if(cwCardKey===k) return;cwCardKey=k;
   const play=el('button',{class:'btn primary',type:'button'},rec?'Play again (practice)':'Play today’s puzzle');
   play.addEventListener('click',()=>{Sound.unlock();startGame('candywords')});
+  const lb=el('button',{class:'btn',type:'button'},'Today’s leaderboard');lb.addEventListener('click',()=>cwOpen());
   box.replaceChildren(el('div',{class:'daily-txt'},
     el('div',{class:'gmeta'},el('span',{class:'chip new'},'New daily puzzle'),el('span',{class:'chip'},sdkDayName(d))),
     el('h3',{},'Today’s Candy Words'),
-    el('p',{},'A word puzzle for one. Swap letter tiles to spell words of 4 letters or more: they clear, new letters fall, and chains score double. One board for everyone today, 7½ minutes on the clock.'),
+    el('p',{},'A word puzzle for one. Swap letter tiles to spell words of 4 letters or more: they clear, new letters fall, and chains score double. One board for everyone today, 7½ minutes on the clock, and a leaderboard for the top score, the best word and the most words.'),
     rec?el('p',{class:'cw-today'},'Your score today: ',el('b',{},String(rec.score))):null),
     el('div',{class:'cw-mini','aria-hidden':'true'},...'CANDY'.split('').map(c=>el('span',{class:'cw-t '+cwTone(c.toLowerCase())},el('b',{},c),el('small',{},String(CW_PTS[c.toLowerCase()]))))),
-    el('div',{class:'daily-go'},play));
+    el('div',{class:'daily-go'},play,lb));
 }
 
 /* the clock ticks here; when it runs out (and the last swap has finished falling) the game ends */
